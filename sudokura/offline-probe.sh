@@ -1,27 +1,33 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Runs only inside the workflow's network-disabled, unprivileged container.
+# Only run from the unprivileged Docker container configured with --network none.
 cd /work/fdroid
 mkdir -p logs
+: > logs/outcome.txt
 APP_ID=org.cajapersonal.sudokura
 EXPECTED_SHA=c1b3eb31e82bcc06a078bc10e10f342aa8329e25
 
-if [[ "$(ls -1 /sys/class/net | tr '\n' ' ')" != "lo " ]]; then
-  echo 'BLOCKED: the test container has an unexpected network interface' | tee logs/outcome.txt
-  exit 90
-fi
+fail() {
+  local reason="$1"
+  local status="${2:-1}"
+  printf 'result=FAIL reason=%s\n' "$reason" >> logs/outcome.txt
+  printf 'PROBE BLOCKED: %s\n' "$reason" >&2
+  exit "$status"
+}
 
-test -f "metadata/${APP_ID}.yml"
-test -d "build/${APP_ID}/.git"
-if [[ "$(git -C "build/${APP_ID}" rev-parse HEAD)" != "$EXPECTED_SHA" ]]; then
-  echo 'BLOCKED: source commit mismatch' | tee logs/outcome.txt
-  exit 91
-fi
-if [[ -n "${GITHUB_TOKEN:-}${GH_TOKEN:-}${CI_JOB_TOKEN:-}${SSH_AUTH_SOCK:-}" ]]; then
-  echo 'BLOCKED: credentials or SSH agent are present' | tee logs/outcome.txt
-  exit 92
-fi
+network_devices="$(ls -1 /sys/class/net)"
+[[ "$network_devices" == 'lo' ]] || fail 'container_has_nonloopback_network' 90
+[[ -z "${GITHUB_TOKEN:-}${GH_TOKEN:-}${CI_JOB_TOKEN:-}${SSH_AUTH_SOCK:-}" ]] || \
+  fail 'credentials_or_ssh_agent_present' 92
+[[ -f "metadata/$APP_ID.yml" ]] || fail 'local_metadata_missing'
+[[ -d mirror/sudokura.git ]] || fail 'verified_source_mirror_missing'
+[[ ! -e "build/$APP_ID" ]] || fail 'unexpected_preexisting_source_checkout'
+[[ "$(git --git-dir=mirror/sudokura.git rev-parse HEAD)" == "$EXPECTED_SHA" ]] || \
+  fail 'local_mirror_sha_mismatch'
+
+grep -Fxq 'Repo: file:///work/fdroid/mirror/sudokura.git' "metadata/$APP_ID.yml" || \
+  fail 'metadata_source_is_not_the_local_mirror'
 
 {
   printf 'source_sha=%s\n' "$EXPECTED_SHA"
@@ -38,24 +44,40 @@ fi
 run_check() {
   local label="$1"
   shift
-  printf 'RUNNING %s\n' "$label" | tee logs/outcome.txt
+  printf 'RUNNING %s\n' "$label" >> logs/outcome.txt
   if "$@" > "logs/${label}.log" 2>&1; then
-    printf '%s=PASS\n' "$label" >> logs/outcome.txt
+    printf '%s_command=PASS\n' "$label" >> logs/outcome.txt
   else
-    local status=$?
-    printf '%s=FAIL exit=%s\n' "$label" "$status" >> logs/outcome.txt
-    echo "BLOCKED: ${label} failed; inspecting the log is required before another run"
-    exit "$status"
+    local rc=$?
+    printf '%s_command=FAIL exit=%s\n' "$label" "$rc" >> logs/outcome.txt
+    fail "${label}_command_failed" "$rc"
   fi
 }
 
-# No update/deploy/publish/sign commands. Missing offline inputs cause failure.
+verify_check() {
+  local label="$1"
+  shift
+  if python3 tools/verify-probe.py "$@" >> "logs/${label}.verify.log" 2>&1; then
+    printf '%s_verified=PASS\n' "$label" >> logs/outcome.txt
+  else
+    printf '%s_verified=FAIL\n' "$label" >> logs/outcome.txt
+    fail "${label}_verification_failed"
+  fi
+}
+
+# Local fdroiddata-style recipe; no init, update, publish, deploy, upload or signing.
 run_check readmeta fdroid readmeta
 run_check lint fdroid lint "$APP_ID"
-run_check scanner fdroid scanner "$APP_ID"
-run_check build fdroid build --test --no-refresh --no-tarball "${APP_ID}:1"
+run_check scanner fdroid scanner -v "${APP_ID}:1"
+verify_check scanner scanner logs/scanner.log
+verify_check source source /work/fdroid
 
-if find unsigned -maxdepth 1 -type f -name '*.apk' -print -quit 2>/dev/null | grep -q .; then
-  find unsigned -maxdepth 1 -type f -name '*.apk' -exec sha256sum {} \; > logs/unsigned-apk-sha256.txt
-fi
-printf 'result=LOCAL_TEST_COMPLETED\n' >> logs/outcome.txt
+# The --stop flag forces fdroidserver 2.4.5 to return nonzero on build errors.
+run_check build fdroid build --stop --test --no-refresh --no-tarball "${APP_ID}:1"
+verify_check build build logs/build.log
+verify_check source_after_build source /work/fdroid
+verify_check apk apk "tmp/${APP_ID}_1.apk" \
+  --aapt "$ANDROID_HOME/build-tools/35.0.0/aapt" \
+  --receipt logs/unsigned-apk-sha256.txt
+
+printf 'result=REAL_OFFLINE_FDROID_TEST_PASSED\n' >> logs/outcome.txt
