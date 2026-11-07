@@ -1,0 +1,28 @@
+# Local build experiment only. Not a submission or accepted store recipe.
+# The source checkout and native dependencies are staged in disposable scratch.
+Categories:
+  - Games
+License: GPL-3.0-only
+AutoName: Sudokura
+SourceCode: https://github.com/santirodriguez/Sudokura
+IssueTracker: https://github.com/santirodriguez/Sudokura/issues
+RepoType: git
+Repo: https://github.com/santirodriguez/Sudokura.git
+
+Builds:
+  - versionName: 1.4.0
+    versionCode: 1
+    commit: c1b3eb31e82bcc06a078bc10e10f342aa8329e25
+    subdir: android
+    ndk: 28.2.13676358
+    gradle:
+      - production
+    gradleprops:
+      - sudokuraFont=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf
+      - sudokuraFontLicense=/usr/share/doc/fonts-dejavu-core/copyright
+    prebuild:
+      - cd .. && make assets
+    output: app/build/outputs/apk/production/release/app-production-release-unsigned.apk
+
+CurrentVersion: 1.4.0
+CurrentVersionCode: 1
