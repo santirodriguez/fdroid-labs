@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
-      GRADLE_USER_HOME: ${{ runner.temp }}/gradle-home
+      GRADLE_USER_HOME: /tmp/sudokura-gradle-home
       EXPECTED_SOURCE_SHA: c1b3eb31e82bcc06a078bc10e10f342aa8329e25
     steps:
       - name: Checkout laboratory without saved credentials
