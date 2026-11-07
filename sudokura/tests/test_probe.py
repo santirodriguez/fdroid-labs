@@ -28,7 +28,7 @@ class ProbeChecks(unittest.TestCase):
 
     def test_scanner_requires_genuine_zero_problems(self):
         good = (f'2026-11-07 INFO: Processing {VERIFY.APP_ID}\n'
-                '2026-11-07 INFO: ...scanning version 1.4.0\n'
+                '2026-11-07 INFO: ...scanning version 1.4.1\n'
                 f'2026-11-07 INFO: Getting source for revision {VERIFY.EXPECTED_SHA}\n'
                 '2026-11-07 INFO: Finished\n0 problems found\n')
         VERIFY.verify_scanner(self.write('scanner.log', good))
@@ -37,7 +37,7 @@ class ProbeChecks(unittest.TestCase):
             good.replace('0 problems found', ''),
             good.replace('0 problems found', '0 problems found\n1 problems found'),
             good.replace('0 problems found', '0 problems found\nWARNING: VCS error'),
-            good.replace('...scanning version 1.4.0', '...skipped version 1.4.0'),
+            good.replace('...scanning version 1.4.1', '...skipped version 1.4.1'),
             good.replace(VERIFY.EXPECTED_SHA, '0' * 40),
         ]
         for value in failures:
@@ -47,7 +47,7 @@ class ProbeChecks(unittest.TestCase):
 
     def test_first_false_green_scanner_log_fails(self):
         log = ('INFO: Processing org.cajapersonal.sudokura\n'
-               'INFO: ...scanning version 1.4.0\n'
+               'INFO: ...scanning version 1.4.1\n'
                f'INFO: Getting source for revision {VERIFY.EXPECTED_SHA}\n'
                'WARNING: VCS error while scanning app: Git clone failed\n'
                'INFO: Finished\n1 problems found\n')
@@ -55,7 +55,7 @@ class ProbeChecks(unittest.TestCase):
             VERIFY.verify_scanner(self.write('scanner.log', log))
 
     def test_build_must_report_real_success(self):
-        good = ('INFO: Successfully built version 1.4.0 of ' + VERIFY.APP_ID + ' from ' + VERIFY.EXPECTED_SHA + '\n'
+        good = ('INFO: Successfully built version 1.4.1 of ' + VERIFY.APP_ID + ' from ' + VERIFY.EXPECTED_SHA + '\n'
                 'INFO: Finished\n1 build succeeded\n')
         VERIFY.verify_build(self.write('build.log', good))
         for bad in [
@@ -63,29 +63,48 @@ class ProbeChecks(unittest.TestCase):
             good + 'INFO: 1 build failed\n',
             good.replace('1 build succeeded', '0 builds succeeded'),
             'ERROR: Traceback\n1 build succeeded\n',
-            good.replace('Successfully built version 1.4.0', 'Failed building version 1.4.0'),
+            good.replace('Successfully built version 1.4.1', 'Failed building version 1.4.1'),
         ]:
             with self.subTest(bad=bad[-75:]):
                 with self.assertRaises(VERIFY.VerificationError):
                     VERIFY.verify_build(self.write('build.log', bad))
 
     def test_unsigned_apk_is_required_and_package_checked(self):
-        apk = self.root / 'org.cajapersonal.sudokura_1.apk'
+        apk = self.root / 'org.cajapersonal.sudokura_2.apk'
         receipt = self.root / 'receipt.txt'
         aapt = self.root / 'aapt'
-        self.write('aapt', "#!/bin/sh\necho \"package: name='org.cajapersonal.sudokura' versionCode='1' versionName='1.4.0'\"\n")
+        self.write('aapt', "#!/bin/sh\necho \"package: name='org.cajapersonal.sudokura' versionCode='2' versionName='1.4.1'\"\n")
         aapt.chmod(aapt.stat().st_mode | stat.S_IEXEC)
+        notice = self.root / 'LICENSE-MIT.txt'
+        notice.write_bytes(b'Copyright (c) 2013 Panayiotis Lipiridis\nPermission is hereby granted\n')
         with self.assertRaises(VERIFY.VerificationError):
-            VERIFY.verify_apk(apk, aapt, receipt)
+            VERIFY.verify_apk(apk, aapt, receipt, notice)
         with zipfile.ZipFile(apk, 'w', compression=zipfile.ZIP_STORED) as zipped:
             zipped.writestr('AndroidManifest.xml', 'fake manifest for local fault injection')
             zipped.writestr('classes.dex', 'fake' * 100)
-        VERIFY.verify_apk(apk, aapt, receipt)
-        self.assertIn('version_code=1', receipt.read_text())
+            zipped.writestr('assets/licenses/flag-icons-MIT.txt', notice.read_bytes())
+        VERIFY.verify_apk(apk, aapt, receipt, notice)
+        self.assertIn('version_code=2', receipt.read_text())
         self.assertIn('artifact_upload=DISABLED', receipt.read_text())
-        aapt.write_text("#!/bin/sh\necho \"package: name='org.cajapersonal.sudokura' versionCode='2' versionName='1.4.0'\"\n")
+        aapt.write_text("#!/bin/sh\necho \"package: name='org.cajapersonal.sudokura' versionCode='3' versionName='1.4.1'\"\n")
         with self.assertRaises(VERIFY.VerificationError):
-            VERIFY.verify_apk(apk, aapt, receipt)
+            VERIFY.verify_apk(apk, aapt, receipt, notice)
+
+    def test_missing_or_tampered_flag_notice_is_rejected(self):
+        apk = self.root / 'test.apk'
+        receipt = self.root / 'receipt.txt'
+        notice = self.root / 'LICENSE-MIT.txt'
+        notice.write_bytes(b'Copyright (c) 2013 Panayiotis Lipiridis\nPermission is hereby granted\n')
+        aapt = self.root / 'aapt'
+        aapt.write_text("#!/bin/sh\necho \"package: name='org.cajapersonal.sudokura' versionCode='2' versionName='1.4.1'\"\n")
+        aapt.chmod(aapt.stat().st_mode | stat.S_IEXEC)
+        for bundled in (None, b'altered'):
+            with zipfile.ZipFile(apk, 'w') as archive:
+                archive.writestr('AndroidManifest.xml', b'fixture')
+                if bundled is not None:
+                    archive.writestr('assets/licenses/flag-icons-MIT.txt', bundled)
+            with self.subTest(bundled=bundled), self.assertRaises(VERIFY.VerificationError):
+                VERIFY.verify_apk(apk, aapt, receipt, notice)
 
     def test_stage_source_from_detached_local_checkout_only(self):
         origin = self.root / 'origin'

@@ -10,7 +10,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 RECIPE = ROOT / 'metadata' / 'org.cajapersonal.sudokura.yml'
-SOURCE_SHA = 'c1b3eb31e82bcc06a078bc10e10f342aa8329e25'
+SOURCE_SHA = '810888803430d0664c6d02e1b49f67b5e590141d'
 RESTORE = ('python3 /work/fdroid/tools/offline-android-inputs.py restore '
            f'. /work/verified-inputs {SOURCE_SHA}')
 ASSETS = 'cd .. && make assets'
@@ -35,8 +35,8 @@ def validate_recipe(text):
     if f'    commit: {SOURCE_SHA}\n' not in build:
         raise ValueError('Immutable published commit changed')
     if ('    gradle:\n      - production\n' not in build
-            or '  - versionName: 1.4.0\n' not in build
-            or '    versionCode: 1\n' not in build):
+            or '  - versionName: 1.4.1\n' not in build
+            or '    versionCode: 2\n' not in build):
         raise ValueError('Wrong build variant or version')
     if text.count('Repo: https://github.com/santirodriguez/Sudokura.git') != 1:
         raise ValueError('Template upstream source identity changed')
@@ -78,11 +78,26 @@ class RecipeBuildOrderTests(unittest.TestCase):
 
     def test_source_revision_and_version_are_locked(self):
         for old, new in ((SOURCE_SHA, '0' * 40),
-                         ('versionCode: 1', 'versionCode: 2'),
-                         ('versionName: 1.4.0', 'versionName: 1.4.1'),
+                         ('versionCode: 2', 'versionCode: 3'),
+                         ('versionName: 1.4.1', 'versionName: 1.4.2'),
                          ('- production', '- prototype')):
             with self.subTest(field=old), self.assertRaises(ValueError):
                 validate_recipe(self.recipe.replace(old, new))
+
+    def test_source_pins_match_manual_only_workflow(self):
+        workflow = (ROOT.parent / '.github/workflows/sudokura-fdroid-local.yml').read_text()
+        probe = (ROOT / 'offline-probe.sh').read_text()
+        verifier = (ROOT / 'verify-probe.py').read_text()
+        self.assertIn('  workflow_dispatch:', workflow)
+        for trigger in ('  push:', '  pull_request:', '  schedule:', '  release:'):
+            self.assertNotIn('\n' + trigger, workflow)
+        self.assertIn(f'EXPECTED_SOURCE_SHA: {SOURCE_SHA}', workflow)
+        self.assertIn(f'          ref: {SOURCE_SHA}', workflow)
+        self.assertIn(f'EXPECTED_SHA={SOURCE_SHA}', probe)
+        self.assertIn(f"EXPECTED_SHA = '{SOURCE_SHA}'", verifier)
+        self.assertIn('no-refresh', probe)
+        self.assertNotIn('fdroid publish', probe)
+        self.assertNotIn('fdroid deploy', probe)
 
     def test_no_remote_submission_or_signing_fields(self):
         validate_recipe(self.recipe)

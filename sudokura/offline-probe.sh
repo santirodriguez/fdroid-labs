@@ -6,7 +6,7 @@ cd /work/fdroid
 mkdir -p logs
 : > logs/outcome.txt
 APP_ID=org.cajapersonal.sudokura
-EXPECTED_SHA=c1b3eb31e82bcc06a078bc10e10f342aa8329e25
+EXPECTED_SHA=810888803430d0664c6d02e1b49f67b5e590141d
 
 fail() {
   local reason="$1"
@@ -78,16 +78,17 @@ verify_check() {
 # Local fdroiddata-style recipe; no init, update, publish, deploy, upload or signing.
 run_check readmeta fdroid readmeta
 run_check lint fdroid lint "$APP_ID"
-run_check scanner fdroid scanner -v "${APP_ID}:1"
+run_check scanner fdroid scanner -v "${APP_ID}:2"
 verify_check scanner scanner logs/scanner.log
 verify_check source source /work/fdroid
 
 # The --stop flag forces fdroidserver 2.4.5 to return nonzero on build errors.
-run_check build fdroid build --stop --test --no-refresh --no-tarball "${APP_ID}:1"
+run_check build fdroid build --stop --test --no-refresh --no-tarball "${APP_ID}:2"
 verify_check build build logs/build.log
 verify_check source_after_build source /work/fdroid
-verify_check apk apk "tmp/${APP_ID}_1.apk" \
+verify_check apk apk "tmp/${APP_ID}_2.apk" \
   --aapt "$ANDROID_HOME/build-tools/35.0.0/aapt" \
-  --receipt logs/unsigned-apk-sha256.txt
+  --receipt logs/unsigned-apk-sha256.txt \
+  --notice-source "build/$APP_ID/assets/flags/LICENSE-MIT.txt"
 
 printf 'result=REAL_OFFLINE_FDROID_TEST_PASSED\n' >> logs/outcome.txt
