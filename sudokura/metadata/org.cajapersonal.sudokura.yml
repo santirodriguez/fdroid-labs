@@ -21,6 +21,7 @@ Builds:
       - sudokuraFont=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf
       - sudokuraFontLicense=/usr/share/doc/fonts-dejavu-core/copyright
     prebuild:
+      - python3 /work/fdroid/tools/offline-android-inputs.py restore . /work/verified-inputs c1b3eb31e82bcc06a078bc10e10f342aa8329e25
       - cd .. && make assets
     output: app/build/outputs/apk/production/release/app-production-release-unsigned.apk
 

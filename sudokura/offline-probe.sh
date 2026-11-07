@@ -29,12 +29,22 @@ network_devices="$(ls -1 /sys/class/net)"
 grep -Fxq 'Repo: file:///work/fdroid/mirror/sudokura.git' "metadata/$APP_ID.yml" || \
   fail 'metadata_source_is_not_the_local_mirror'
 
+# The original Gradle distribution is exposed read-only from a verified archive.
+gradle=/opt/gradle-8.13/bin/gradle
+[[ -x "$gradle" ]] || fail 'verified_gradle_executable_missing'
+[[ -r /work/verified-inputs/dependencies.lock.json ]] || fail 'verified_android_inputs_missing'
+if ! gradle_output="$("$gradle" --version 2>&1)"; then
+  fail 'gradle_version_command_failed'
+fi
+grep -Fxq 'Gradle 8.13' <<< "$gradle_output" || fail 'wrong_gradle_version'
+
 {
   printf 'source_sha=%s\n' "$EXPECTED_SHA"
   printf 'network_interfaces=loopback_only\n'
   printf 'execution=container_without_network\n'
   printf 'signing=NOT_RUN\n'
   printf 'remote_submission=NOT_RUN\n'
+  printf 'verified_gradle_version=8.13\n'
   fdroid --version || true
   java -version 2>&1 | head -n 3
   go version

@@ -43,6 +43,7 @@ jobs:
           test -f lab/sudokura/offline-probe.sh
           test -f lab/sudokura/stage-offline-git.sh
           test -f lab/sudokura/verify-probe.py
+          test -f lab/sudokura/offline-android-inputs.py
           bash -n lab/sudokura/offline-probe.sh lab/sudokura/stage-offline-git.sh
           python3 -m unittest discover -s lab/sudokura/tests -v
           echo "Fixed public source: $EXPECTED_SOURCE_SHA"
@@ -90,6 +91,23 @@ jobs:
           # The offline F-Droid attempt must not reuse a prebuilt application.
           rm -rf sudokura/android/app/build sudokura/android/.gradle
 
+      - name: Stage SHA-256 locked SDL and Gradle archives outside the checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 lab/sudokura/offline-android-inputs.py stage sudokura/android "$RUNNER_TEMP/fdroid-verified-inputs" "$EXPECTED_SOURCE_SHA"
+          test -x sudokura/android/.cache/gradle/gradle-8.13/bin/gradle
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          android = Path('sudokura/android')
+          entry = json.loads((android / 'dependencies.lock.json').read_text())['Gradle']
+          assert entry['version'] == '8.13'
+          root = android / '.cache' / 'gradle' / entry['directory']
+          assert root.is_dir()
+          assert (root / '.sudokura-source-sha256').read_text().strip() == entry['sha256']
+          PY
+
       - name: Prepare disposable open-source test tooling
         shell: bash
         run: |
@@ -111,8 +129,10 @@ jobs:
           test -s "$work/config/categories.yml"
           cp lab/sudokura/offline-probe.sh "$work/tools/"
           cp lab/sudokura/verify-probe.py "$work/tools/"
+          cp lab/sudokura/offline-android-inputs.py "$work/tools/"
           cat > "$work/config.yml" <<'CONFIG'
           sdk_path: /opt/android-sdk
+          gradle: /opt/gradle-8.13/bin/gradle
           ndk_paths:
             '28.2.13676358': /opt/android-sdk/ndk/28.2.13676358
           CONFIG
@@ -127,7 +147,16 @@ jobs:
         run: |
           set -euo pipefail
           work="$RUNNER_TEMP/fdroid-local"
-          docker run --rm --network none --cap-drop ALL --security-opt no-new-privileges --user "$(id -u):$(id -g)" -e HOME=/work/fdroid/home -e ANDROID_HOME=/opt/android-sdk -e ANDROID_SDK_ROOT=/opt/android-sdk -e GRADLE_USER_HOME=/work/gradle-home -v "$work:/work/fdroid:rw" -v "$ANDROID_HOME:/opt/android-sdk:ro" -v "$GRADLE_USER_HOME:/work/gradle-home:rw" -w /work/fdroid sudokura-fdroid-local:probe bash tools/offline-probe.sh
+          docker run --rm --network none --cap-drop ALL --security-opt no-new-privileges \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/work/fdroid/home -e ANDROID_HOME=/opt/android-sdk \
+            -e ANDROID_SDK_ROOT=/opt/android-sdk -e GRADLE_USER_HOME=/work/gradle-home \
+            -v "$work:/work/fdroid:rw" \
+            -v "$ANDROID_HOME:/opt/android-sdk:ro" \
+            -v "$GRADLE_USER_HOME:/work/gradle-home:rw" \
+            -v "$RUNNER_TEMP/fdroid-verified-inputs:/work/verified-inputs:ro" \
+            -v "$PWD/sudokura/android/.cache/gradle/gradle-8.13:/opt/gradle-8.13:ro" \
+            -w /work/fdroid sudokura-fdroid-local:probe bash tools/offline-probe.sh
 
       - name: Preserve short-lived diagnostic logs only
         if: always()
