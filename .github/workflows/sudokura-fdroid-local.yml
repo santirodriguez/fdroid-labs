@@ -97,7 +97,15 @@ jobs:
         run: |
           set -euo pipefail
           work="$RUNNER_TEMP/fdroid-local"
-          mkdir -p "$work/build/org.cajapersonal.sudokura" "$work/metadata" "$work/tools" "$work/logs" "$work/home"
+          mkdir -p "$work/build/org.cajapersonal.sudokura" "$work/metadata" "$work/tools" "$work/logs" "$work/home" "$work/config"
+          # Local-only category registry required by fdroidserver lint.
+          # This is a disposable test fixture, not a F-Droid submission.
+          cat > "$work/config/categories.yml" <<'CATEGORIES'
+          Games:
+            name: Games
+            description: Games and puzzles
+          CATEGORIES
+          test -s "$work/config/categories.yml"
           cp -a sudokura/. "$work/build/org.cajapersonal.sudokura/"
           cp lab/sudokura/metadata/org.cajapersonal.sudokura.yml "$work/metadata/"
           cp lab/sudokura/offline-probe.sh "$work/tools/"
