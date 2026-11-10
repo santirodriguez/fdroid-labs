@@ -68,6 +68,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends fonts-dejavu-core
           test -s /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf
           test -s /usr/share/doc/fonts-dejavu-core/copyright
+          python3 lab/sudokura/repro-check.py font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf /usr/share/doc/fonts-dejavu-core/copyright
           : "${ANDROID_HOME:?Expected hosted Android SDK}"
           sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           test -x "$sdkmanager"
@@ -143,20 +144,37 @@ jobs:
           test -s "$work/logs/source-provenance.txt"
 
       - name: Execute local checks without any network access
+        id: offline_probe
         shell: bash
         run: |
           set -euo pipefail
           work="$RUNNER_TEMP/fdroid-local"
+          # Attempt to reproduce the source/debug paths in the existing b057 build.
+          # No source files or generated binary build IDs are rewritten.
+          repro_flags="-ffile-prefix-map=/work/fdroid/build/org.cajapersonal.sudokura=/home/runner/work/Sudokura/Sudokura -ffile-prefix-map=/opt/android-sdk=/usr/local/lib/android/sdk -fdebug-compilation-dir=/home/runner/work/Sudokura/Sudokura/android/app/.cxx/RelWithDebInfo/61k4uzg3/arm64-v8a"
+          printf 'CFLAGS=%s\nCXXFLAGS=%s\n' "$repro_flags" "$repro_flags" > "$work/logs/repro-flags.txt"
           docker run --rm --network none --cap-drop ALL --security-opt no-new-privileges \
             --user "$(id -u):$(id -g)" \
             -e HOME=/work/fdroid/home -e ANDROID_HOME=/opt/android-sdk \
             -e ANDROID_SDK_ROOT=/opt/android-sdk -e GRADLE_USER_HOME=/work/gradle-home \
+            -e CFLAGS="$repro_flags" -e CXXFLAGS="$repro_flags" \
             -v "$work:/work/fdroid:rw" \
             -v "$ANDROID_HOME:/opt/android-sdk:ro" \
+            -v /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:ro \
+            -v /usr/share/doc/fonts-dejavu-core/copyright:/usr/share/doc/fonts-dejavu-core/copyright:ro \
             -v "$GRADLE_USER_HOME:/work/gradle-home:rw" \
             -v "$RUNNER_TEMP/fdroid-verified-inputs:/work/verified-inputs:ro" \
             -v "$PWD/sudokura/android/.cache/gradle/gradle-8.13:/opt/gradle-8.13:ro" \
             -w /work/fdroid sudokura-fdroid-local:probe bash tools/offline-probe.sh
+
+      - name: Compare all rebuilt payloads with the existing signed candidate
+        if: ${{ success() && steps.offline_probe.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 lab/sudokura/repro-check.py apk \
+            "$RUNNER_TEMP/fdroid-local/tmp/org.cajapersonal.sudokura_2.apk" \
+            "$RUNNER_TEMP/fdroid-local/logs/repro-payload.json"
 
       - name: Preserve short-lived diagnostic logs only
         if: always()
@@ -169,7 +187,7 @@ jobs:
 
       # Test-only unsigned APK for exact-byte comparison, never a release asset.
       - name: Preserve short-lived source-built unsigned APK
-        if: success()
+        if: ${{ always() && steps.offline_probe.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: sudokura-fdroid-local-unsigned-code2
