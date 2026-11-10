@@ -6,7 +6,7 @@ cd /work/fdroid
 mkdir -p logs
 : > logs/outcome.txt
 APP_ID=org.cajapersonal.sudokura
-EXPECTED_SHA=810888803430d0664c6d02e1b49f67b5e590141d
+EXPECTED_SHA=b057341c84cd988cd15b3329507aaa6151449f5b
 
 fail() {
   local reason="$1"

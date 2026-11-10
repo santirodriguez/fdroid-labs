@@ -14,7 +14,7 @@ import sys
 import zipfile
 
 APP_ID = 'org.cajapersonal.sudokura'
-EXPECTED_SHA = '810888803430d0664c6d02e1b49f67b5e590141d'
+EXPECTED_SHA = 'b057341c84cd988cd15b3329507aaa6151449f5b'
 LOCAL_REPO = 'file:///work/fdroid/mirror/sudokura.git'
 ERRORS = re.compile(r'(?im)\b(?:WARNING|ERROR|CRITICAL|Traceback|Could not scan|VCS error)\b')
 
@@ -121,7 +121,7 @@ def verify_apk(apk, aapt, receipt, notice_source):
     receipt.write_text('apk_sha256=' + sha.hexdigest() + '\n'
                        'app_id=' + APP_ID + '\nversion_code=2\nversion_name=1.4.1\n'
                        'source_sha=' + EXPECTED_SHA + '\n'
-                       'artifact_upload=DISABLED\n', encoding='utf-8')
+                       'artifact_upload=PLANNED_GITHUB_TEST_ONLY\n', encoding='utf-8')
 
 
 def main():

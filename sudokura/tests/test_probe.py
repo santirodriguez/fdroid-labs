@@ -85,7 +85,7 @@ class ProbeChecks(unittest.TestCase):
             zipped.writestr('assets/licenses/flag-icons-MIT.txt', notice.read_bytes())
         VERIFY.verify_apk(apk, aapt, receipt, notice)
         self.assertIn('version_code=2', receipt.read_text())
-        self.assertIn('artifact_upload=DISABLED', receipt.read_text())
+        self.assertIn('artifact_upload=PLANNED_GITHUB_TEST_ONLY', receipt.read_text())
         aapt.write_text("#!/bin/sh\necho \"package: name='org.cajapersonal.sudokura' versionCode='3' versionName='1.4.1'\"\n")
         with self.assertRaises(VERIFY.VerificationError):
             VERIFY.verify_apk(apk, aapt, receipt, notice)

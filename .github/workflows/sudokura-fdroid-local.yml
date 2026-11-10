@@ -17,7 +17,7 @@ jobs:
     timeout-minutes: 60
     env:
       GRADLE_USER_HOME: /tmp/sudokura-gradle-home
-      EXPECTED_SOURCE_SHA: 810888803430d0664c6d02e1b49f67b5e590141d
+      EXPECTED_SOURCE_SHA: b057341c84cd988cd15b3329507aaa6151449f5b
     steps:
       - name: Checkout laboratory without saved credentials
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -29,7 +29,7 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           repository: santirodriguez/Sudokura
-          ref: 810888803430d0664c6d02e1b49f67b5e590141d
+          ref: b057341c84cd988cd15b3329507aaa6151449f5b
           path: sudokura
           persist-credentials: false
 
@@ -166,3 +166,13 @@ jobs:
           path: ${{ runner.temp }}/fdroid-local/logs/
           retention-days: 3
           if-no-files-found: warn
+
+      # Test-only unsigned APK for exact-byte comparison, never a release asset.
+      - name: Preserve short-lived source-built unsigned APK
+        if: success()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: sudokura-fdroid-local-unsigned-code2
+          path: ${{ runner.temp }}/fdroid-local/tmp/org.cajapersonal.sudokura_2.apk
+          retention-days: 3
+          if-no-files-found: error
