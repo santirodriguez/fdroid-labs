@@ -1,0 +1,74 @@
+name: F-Droid free runner feasibility preflight
+
+# Manual-only check. Does not build Android or contact F-Droid/GitLab.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sudokura-fdroid-free-runner-preflight
+  cancel-in-progress: false
+
+jobs:
+  inspect-standard-runner:
+    # No runner is allocated if the laboratory becomes private.
+    if: ${{ github.repository == 'santirodriguez/fdroid-labs' && github.event.repository.private == false }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Check KVM, memory, and disk without installing or downloading
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import shutil
+          import stat
+          from pathlib import Path
+
+          event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
+          if (os.environ.get('GITHUB_REPOSITORY') != 'santirodriguez/fdroid-labs'
+                  or event.get('repository', {}).get('private') is not False):
+              raise SystemExit('Not the authorized public laboratory; refusing to proceed')
+
+          disk = shutil.disk_usage('/')
+          mem_kib = 0
+          for line in Path('/proc/meminfo').read_text().splitlines():
+              if line.startswith('MemTotal:'):
+                  mem_kib = int(line.split()[1])
+                  break
+          kvm_path = Path('/dev/kvm')
+          kvm = (kvm_path.exists() and stat.S_ISCHR(kvm_path.stat().st_mode)
+                 and os.access(kvm_path, os.R_OK | os.W_OK))
+          gib = 1024 ** 3
+          free_gib = disk.free / gib
+          total_gib = disk.total / gib
+          memory_gib = mem_kib * 1024 / gib
+
+          # Report observed capabilities; no invented VM resource requirement.
+          # This job never runs a VM/build even when KVM is available.
+          status = 'KVM_AVAILABLE_RESOURCE_REVIEW_REQUIRED' if kvm else 'VM_KVM_UNAVAILABLE'
+          report = [
+              '# Sudokura F-Droid free-runner feasibility',
+              '',
+              '- Repository: santirodriguez/fdroid-labs (public)',
+              '- Runner: standard ubuntu-24.04',
+              '- Cost guard: no paid runner, services, caches, or artifact uploads',
+              f'- Usable KVM: {str(bool(kvm)).lower()}',
+              f'- RAM: {memory_gib:.2f} GiB',
+              f'- Disk: {free_gib:.2f} GiB free / {total_gib:.2f} GiB total',
+              f'- VM feasibility preflight: {status}',
+              '',
+              'This is an environment-only check, not a F-Droid build,',
+              'signature-copy check, or evidence of buildserver compatibility.',
+              'If blocked, do not provision paid resources; consider an',
+              'independently reviewed clean-container approach on the free runner.',
+          ]
+          text = '\n'.join(report) + '\n'
+          print(text)
+          with Path(os.environ['GITHUB_STEP_SUMMARY']).open('a', encoding='utf-8') as output:
+              output.write(text)
+          PY
