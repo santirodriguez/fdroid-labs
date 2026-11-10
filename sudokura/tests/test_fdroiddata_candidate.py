@@ -1,0 +1,85 @@
+"""Validate the staged, unsubmitted official F-Droid metadata candidate offline."""
+from pathlib import Path
+import subprocess
+import tempfile
+import unittest
+import zipfile
+
+import yaml
+
+CANDIDATE = Path(__file__).resolve().parents[1] / 'fdroiddata-candidate'
+METADATA = CANDIDATE / 'metadata' / 'org.cajapersonal.sudokura.yml'
+PATCH_DIR = CANDIDATE / 'metadata' / 'org.cajapersonal.sudokura'
+APP_ID = 'org.cajapersonal.sudokura'
+SOURCE_SHA = 'b057341c84cd988cd15b3329507aaa6151449f5b'
+CERT_SHA = 'fde951e3d2ef42e41c7186ee965944aeca549d590ad080711dd3d875f82df66d'
+
+
+class FdroiddataCandidateTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.metadata = yaml.safe_load(METADATA.read_text(encoding='utf-8'))
+        cls.build = cls.metadata['Builds'][0]
+
+    def test_source_binary_and_original_signer_identity(self):
+        self.assertEqual(self.metadata['AllowedAPKSigningKeys'], CERT_SHA)
+        self.assertEqual(self.metadata['Repo'], 'https://github.com/santirodriguez/Sudokura.git')
+        self.assertEqual(self.build['commit'], SOURCE_SHA)
+        self.assertEqual((self.build['versionName'], self.build['versionCode']), ('1.4.1', 2))
+        self.assertTrue(self.build['binary'].endswith('/v1.4.1/Sudokura-1.4.1-Android-arm64.apk'))
+        self.assertEqual(self.metadata['UpdateCheckMode'], 'None')
+        self.assertEqual(self.metadata['AutoUpdateMode'], 'None')
+
+    def test_no_undisclosed_lab_working_paths(self):
+        text = METADATA.read_text(encoding='utf-8')
+        self.assertEqual(self.build['subdir'], 'android')
+        self.assertNotIn('gradle', self.build)  # Uses checked-out, checksum-pinned Gradle 8.13.
+        self.assertEqual(self.build['patch'], ['native-paths.patch', 'signer35-align.patch', 'source-only.patch'])
+        for name in self.build['patch']:
+            self.assertTrue((PATCH_DIR / name).is_file())
+        for forbidden in ('/work/fdroid', '/work/verified-inputs', 'mirror/sudokura.git', 'docker run'):
+            self.assertNotIn(forbidden, text)
+        self.assertIn('prepare_sources.py --source-only', self.build['prebuild'][0])
+        self.assertIn('prepare_sources.py --gradle-only', self.build['build'][0])
+        self.assertIn('cd .. && make assets', self.build['build'][-2])
+        self.assertIn('cd android && bash gradlew', self.build['build'][-1])
+        self.assertIn('$$OUT$$', self.build['postbuild'][0])
+
+    def test_native_flags_and_source_scanner_order(self):
+        native = (PATCH_DIR / 'native-paths.patch').read_text(encoding='utf-8')
+        sources = (PATCH_DIR / 'source-only.patch').read_text(encoding='utf-8')
+        self.assertIn('-ffile-prefix-map=${SUDOKURA_ROOT}', native)
+        self.assertIn('-ffile-prefix-map=$ENV{ANDROID_HOME}', native)
+        self.assertIn('set(CMAKE_EXPORT_COMPILE_COMMANDS ON)', native)
+        self.assertIn('subset = ["SDL2", "SDL2_ttf", "SDL2_mixer"]', sources)
+        self.assertIn('subset = ["Gradle"]', sources)
+
+    def test_16k_padding_patch_rebuilds_unsigned_zip_without_payload_change(self):
+        patch = (PATCH_DIR / 'signer35-align.patch').read_text(encoding='utf-8')
+        data = patch.splitlines(keepends=True)
+        first = next(i for i, line in enumerate(data) if line.startswith('@@ ')) + 1
+        source = ''.join(line[1:] for line in data[first:] if line.startswith('+'))
+        self.assertIn('def rebuild(', source)
+        with tempfile.TemporaryDirectory() as temp:
+            script = Path(temp) / 'fdroid_align_16k.py'
+            script.write_text(source, encoding='utf-8')
+            apk = Path(temp) / 'unsigned.apk'
+            with zipfile.ZipFile(apk, 'w') as z:
+                z.writestr('lib/arm64-v8a/libmain.so', b'A' * 128, compress_type=zipfile.ZIP_STORED)
+                z.writestr('assets/readme.txt', b'B' * 128, compress_type=zipfile.ZIP_DEFLATED)
+            result = subprocess.run(['python3', str(script), str(apk)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            with zipfile.ZipFile(apk) as z:
+                self.assertIsNone(z.testzip())
+                self.assertEqual(z.read('lib/arm64-v8a/libmain.so'), b'A' * 128)
+                self.assertEqual(z.read('assets/readme.txt'), b'B' * 128)
+                info = z.getinfo('lib/arm64-v8a/libmain.so')
+                with apk.open('rb') as stream:
+                    stream.seek(info.header_offset + 26)
+                    filename_len = int.from_bytes(stream.read(2), 'little')
+                    extra_len = int.from_bytes(stream.read(2), 'little')
+                self.assertEqual((info.header_offset + 30 + filename_len + extra_len) % 16384, 0)
+
+
+if __name__ == '__main__':
+    unittest.main()

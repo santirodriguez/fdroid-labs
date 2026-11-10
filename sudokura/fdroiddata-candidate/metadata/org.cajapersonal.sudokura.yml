@@ -1,0 +1,46 @@
+# FDROIDDATA CANDIDATE — NOT AN ACCEPTED RECIPE OR A LIVE RELEASE URL.
+# Source, Android identity and original developer signing cert are fixed to 1.4.1.
+Categories:
+  - Games
+License: GPL-3.0-only
+AutoName: Sudokura
+SourceCode: https://github.com/santirodriguez/Sudokura
+IssueTracker: https://github.com/santirodriguez/Sudokura/issues
+RepoType: git
+Repo: https://github.com/santirodriguez/Sudokura.git
+AllowedAPKSigningKeys: fde951e3d2ef42e41c7186ee965944aeca549d590ad080711dd3d875f82df66d
+
+Builds:
+  - versionName: 1.4.1
+    versionCode: 2
+    commit: b057341c84cd988cd15b3329507aaa6151449f5b
+    subdir: android
+    ndk: 28.2.13676358
+    sudo:
+      - apt-get update
+      - apt-get install -y golang-go fonts-dejavu-core
+    patch:
+      - native-paths.patch
+      - signer35-align.patch
+      - source-only.patch
+    prebuild:
+      # Before source scanning: download and verify native SOURCE archives only.
+      - python3 scripts/prepare_sources.py --source-only
+      - rm -f .cache/downloads/SDL2-2.32.10.tar.gz .cache/downloads/SDL2_ttf-2.24.0.tar.gz .cache/downloads/SDL2_mixer-2.8.1.tar.gz
+    build:
+      # Original source's pinned 8.13 Gradle distribution; no lab-only inputs.
+      - python3 scripts/prepare_sources.py --gradle-only
+      - echo 'ae7b7855e115a5966d8b1b3f80f254ccc117ec86f9965e202ee2940453837280  /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf' | sha256sum -c -
+      - echo '63d3ba759d12804c5b31a9d5940d855c1820d1f5999e6b0872eb1c7ff045fbc9  /usr/share/doc/fonts-dejavu-core/copyright' | sha256sum -c -
+      - cd .. && make assets
+      - cd android && bash gradlew --no-daemon :app:assembleProductionRelease -PsudokuraFont=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf -PsudokuraFontLicense=/usr/share/doc/fonts-dejavu-core/copyright
+    output: app/build/outputs/apk/production/release/app-production-release-unsigned.apk
+    postbuild:
+      # Normalize Build Tools 35 ZIP local headers; F-Droid then copies the original v3 signature.
+      - python3 scripts/fdroid_align_16k.py $$OUT$$
+    binary: https://github.com/santirodriguez/Sudokura/releases/download/v1.4.1/Sudokura-1.4.1-Android-arm64.apk
+
+AutoUpdateMode: None
+UpdateCheckMode: None
+CurrentVersion: 1.4.1
+CurrentVersionCode: 2
