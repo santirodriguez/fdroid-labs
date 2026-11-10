@@ -14,7 +14,8 @@ SOURCE_SHA = 'b057341c84cd988cd15b3329507aaa6151449f5b'
 RESTORE = ('python3 /work/fdroid/tools/offline-android-inputs.py restore '
            f'. /work/verified-inputs {SOURCE_SHA}')
 ASSETS = 'cd .. && make assets'
-NATIVE = 'python3 /work/fdroid/tools/native-repro.py apply app/src/main/cpp/CMakeLists.txt'
+NATIVE = ('python3 /work/fdroid/tools/native-repro.py apply '
+          '/work/fdroid/build/org.cajapersonal.sudokura/android/app/src/main/cpp/CMakeLists.txt')
 
 
 def validate_recipe(text):

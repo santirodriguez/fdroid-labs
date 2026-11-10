@@ -26,6 +26,29 @@ class NativeReproTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             NATIVE.patch_cmake(result.encode('utf-8'))
 
+    def test_recipe_and_patch_use_absolute_checkout_path(self):
+        recipe = (ROOT / 'metadata' / 'org.cajapersonal.sudokura.yml').read_text(encoding='utf-8')
+        command = 'python3 /work/fdroid/tools/native-repro.py apply ' + str(NATIVE.CANONICAL_CMAKE_PATH)
+        self.assertTrue(NATIVE.CANONICAL_CMAKE_PATH.is_absolute())
+        self.assertIn('      - ' + command + '\n', recipe)
+        # The preceding build command changes directory; an absolute path is invariant.
+        self.assertIn('      - cd .. && make assets\n      - ' + command + '\n', recipe)
+
+    def test_apply_rejects_relative_path_and_modifies_only_validated_file(self):
+        original = b'cmake_minimum_required(VERSION 3.22.1)\nproject(SudokuraAndroid C)\nadd_subdirectory(dep)\n'
+        with tempfile.TemporaryDirectory() as tmp:
+            canonical = Path(tmp) / 'android/app/src/main/cpp/CMakeLists.txt'
+            canonical.parent.mkdir(parents=True)
+            canonical.write_bytes(original)
+            with patch.object(NATIVE, 'CANONICAL_CMAKE_PATH', canonical), \\
+                    patch.object(NATIVE, 'SOURCE_BLOB', NATIVE.git_blob_sha(original)):
+                with self.assertRaisesRegex(ValueError, 'canonical absolute'):
+                    NATIVE.apply(Path('app/src/main/cpp/CMakeLists.txt'))
+                NATIVE.apply(canonical)
+                self.assertIn(b'add_compile_options', canonical.read_bytes())
+                with self.assertRaises(ValueError):
+                    NATIVE.apply(canonical)
+
     def test_detects_flags_in_all_four_real_native_groups(self):
         with tempfile.TemporaryDirectory() as tmp:
             native_root = Path(tmp) / '.cxx'

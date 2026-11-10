@@ -23,7 +23,7 @@ Builds:
     build:
       - python3 /work/fdroid/tools/offline-android-inputs.py restore . /work/verified-inputs b057341c84cd988cd15b3329507aaa6151449f5b
       - cd .. && make assets
-      - python3 /work/fdroid/tools/native-repro.py apply app/src/main/cpp/CMakeLists.txt
+      - python3 /work/fdroid/tools/native-repro.py apply /work/fdroid/build/org.cajapersonal.sudokura/android/app/src/main/cpp/CMakeLists.txt
     output: app/build/outputs/apk/production/release/app-production-release-unsigned.apk
 
 CurrentVersion: 1.4.1

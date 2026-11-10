@@ -14,6 +14,7 @@ import sys
 SOURCE_BLOB = 'a1c3334e9f35627c2a8dcde2744f6dbc11642e08'
 CMAKE_ANCHOR = 'project(SudokuraAndroid C)\n'
 SOURCE_ROOT = '/work/fdroid/build/org.cajapersonal.sudokura'
+CANONICAL_CMAKE_PATH = Path(SOURCE_ROOT) / 'android/app/src/main/cpp/CMakeLists.txt'
 ORIGINAL_ROOT = '/home/runner/work/Sudokura/Sudokura'
 FLAGS = (
     f'-ffile-prefix-map={SOURCE_ROOT}={ORIGINAL_ROOT}',
@@ -45,8 +46,10 @@ def patch_cmake(data):
 
 
 def apply(path):
-    if path.as_posix() != 'app/src/main/cpp/CMakeLists.txt':
-        raise ValueError('Expected Android subdirectory-relative canonical CMake file')
+    if path != CANONICAL_CMAKE_PATH:
+        raise ValueError('Expected canonical absolute lab checkout CMake path')
+    if path.is_symlink():
+        raise ValueError('Canonical CMake file must not be a symlink')
     path.write_bytes(patch_cmake(path.read_bytes()))
     print('Post-scan lab-only CMake compile flags injected into canonical source')
 
