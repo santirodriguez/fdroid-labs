@@ -43,6 +43,7 @@ jobs:
           test -f lab/sudokura/offline-probe.sh
           test -f lab/sudokura/stage-offline-git.sh
           test -f lab/sudokura/verify-probe.py
+          test -f lab/sudokura/native-repro.py
           test -f lab/sudokura/offline-android-inputs.py
           bash -n lab/sudokura/offline-probe.sh lab/sudokura/stage-offline-git.sh
           python3 -m unittest discover -s lab/sudokura/tests -v
@@ -130,6 +131,7 @@ jobs:
           test -s "$work/config/categories.yml"
           cp lab/sudokura/offline-probe.sh "$work/tools/"
           cp lab/sudokura/verify-probe.py "$work/tools/"
+          cp lab/sudokura/native-repro.py "$work/tools/"
           cp lab/sudokura/offline-android-inputs.py "$work/tools/"
           cat > "$work/config.yml" <<'CONFIG'
           sdk_path: /opt/android-sdk
@@ -149,15 +151,11 @@ jobs:
         run: |
           set -euo pipefail
           work="$RUNNER_TEMP/fdroid-local"
-          # Attempt to reproduce the source/debug paths in the existing b057 build.
-          # No source files or generated binary build IDs are rewritten.
-          repro_flags="-ffile-prefix-map=/work/fdroid/build/org.cajapersonal.sudokura=/home/runner/work/Sudokura/Sudokura -ffile-prefix-map=/opt/android-sdk=/usr/local/lib/android/sdk -fdebug-compilation-dir=/home/runner/work/Sudokura/Sudokura/android/app/.cxx/RelWithDebInfo/61k4uzg3/arm64-v8a"
-          printf 'CFLAGS=%s\nCXXFLAGS=%s\n' "$repro_flags" "$repro_flags" > "$work/logs/repro-flags.txt"
+          # Post-scanner CMake options are applied by the lab recipe, not ambient CFLAGS.
           docker run --rm --network none --cap-drop ALL --security-opt no-new-privileges \
             --user "$(id -u):$(id -g)" \
             -e HOME=/work/fdroid/home -e ANDROID_HOME=/opt/android-sdk \
             -e ANDROID_SDK_ROOT=/opt/android-sdk -e GRADLE_USER_HOME=/work/gradle-home \
-            -e CFLAGS="$repro_flags" -e CXXFLAGS="$repro_flags" \
             -v "$work:/work/fdroid:rw" \
             -v "$ANDROID_HOME:/opt/android-sdk:ro" \
             -v /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:ro \

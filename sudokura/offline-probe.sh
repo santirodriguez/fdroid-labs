@@ -85,6 +85,8 @@ verify_check source source /work/fdroid
 # The --stop flag forces fdroidserver 2.4.5 to return nonzero on build errors.
 run_check build fdroid build --stop --test --no-refresh --no-tarball "${APP_ID}:2"
 verify_check build build logs/build.log
+# Verify real ARM64 compiler commands, not merely declared CMake options.
+run_check nativeflags python3 tools/native-repro.py verify "build/$APP_ID/android/app/.cxx"
 verify_check source_after_build source /work/fdroid
 verify_check apk apk "tmp/${APP_ID}_2.apk" \
   --aapt "$ANDROID_HOME/build-tools/35.0.0/aapt" \

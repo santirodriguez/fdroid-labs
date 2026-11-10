@@ -14,6 +14,7 @@ SOURCE_SHA = 'b057341c84cd988cd15b3329507aaa6151449f5b'
 RESTORE = ('python3 /work/fdroid/tools/offline-android-inputs.py restore '
            f'. /work/verified-inputs {SOURCE_SHA}')
 ASSETS = 'cd .. && make assets'
+NATIVE = 'python3 /work/fdroid/tools/native-repro.py apply app/src/main/cpp/CMakeLists.txt'
 
 
 def validate_recipe(text):
@@ -30,7 +31,7 @@ def validate_recipe(text):
         raise ValueError('Build commands must occur in the post-scan build field')
     commands = re.findall(r'(?m)^      - (.*)$', build.split('    build:\n', 1)[1]
                           .split('    output:', 1)[0])
-    if commands != [RESTORE, ASSETS]:
+    if commands != [RESTORE, ASSETS, NATIVE]:
         raise ValueError('Expected exact verified restore followed by asset generation')
     if f'    commit: {SOURCE_SHA}\n' not in build:
         raise ValueError('Immutable published commit changed')
@@ -69,6 +70,7 @@ class RecipeBuildOrderTests(unittest.TestCase):
                                 f'      - {ASSETS}\n      - {RESTORE}', 1),
             self.recipe.replace(f'      - {RESTORE}\n', '', 1),
             self.recipe.replace(f'      - {ASSETS}\n', '', 1),
+            self.recipe.replace(f'      - {NATIVE}\n', '', 1),
             self.recipe.replace(f'      - {RESTORE}\n',
                                 f'      - {RESTORE}\n      - echo additional-command\n', 1),
         )
@@ -96,6 +98,8 @@ class RecipeBuildOrderTests(unittest.TestCase):
         self.assertIn(f'EXPECTED_SHA={SOURCE_SHA}', probe)
         self.assertIn(f"EXPECTED_SHA = '{SOURCE_SHA}'", verifier)
         self.assertIn('no-refresh', probe)
+        self.assertIn('run_check nativeflags python3 tools/native-repro.py verify', probe)
+        self.assertIn('cp lab/sudokura/native-repro.py "$work/tools/"', workflow)
         self.assertNotIn('fdroid publish', probe)
         self.assertNotIn('fdroid deploy', probe)
 
