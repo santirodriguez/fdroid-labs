@@ -40,7 +40,7 @@ class NativeReproTests(unittest.TestCase):
             canonical = Path(tmp) / 'android/app/src/main/cpp/CMakeLists.txt'
             canonical.parent.mkdir(parents=True)
             canonical.write_bytes(original)
-            with patch.object(NATIVE, 'CANONICAL_CMAKE_PATH', canonical), \\
+            with patch.object(NATIVE, 'CANONICAL_CMAKE_PATH', canonical), \
                     patch.object(NATIVE, 'SOURCE_BLOB', NATIVE.git_blob_sha(original)):
                 with self.assertRaisesRegex(ValueError, 'canonical absolute'):
                     NATIVE.apply(Path('app/src/main/cpp/CMakeLists.txt'))
