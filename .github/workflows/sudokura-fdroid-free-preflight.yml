@@ -48,10 +48,9 @@ jobs:
           total_gib = disk.total / gib
           memory_gib = mem_kib * 1024 / gib
 
-          # 20 GiB is a conservative exploratory floor, not an F-Droid requirement.
-          # This job never runs a VM/build even when the hardware check looks good.
-          vm_candidate = kvm and free_gib >= 20 and memory_gib >= 8
-          status = 'POTENTIALLY_FEASIBLE_NOT_TESTED' if vm_candidate else 'VM_PREFLIGHT_BLOCKED'
+          # Report observed capabilities; no invented VM resource requirement.
+          # This job never runs a VM/build even when KVM is available.
+          status = 'KVM_AVAILABLE_RESOURCE_REVIEW_REQUIRED' if kvm else 'VM_KVM_UNAVAILABLE'
           report = [
               '# Sudokura F-Droid free-runner feasibility',
               '',
