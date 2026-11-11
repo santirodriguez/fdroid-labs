@@ -38,5 +38,5 @@ exercise its updated source-only recipe, font staging, full local source
 build and **actual original-signature copy**, comparing the completed APK
 byte-for-byte with the public release and verifying the original certificate.
 A passing Docker run remains a proxy, not an official F-Droid VM/CI pass.
-An official fdroiddata Merge Request requires separate maintainer approval.
-No original binary/keystore changes or app-store contact are performed here.
+This branch is an isolated validation candidate, not an fdroiddata submission.
+It does not alter the original binary, keys, or published app.
