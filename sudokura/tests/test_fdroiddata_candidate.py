@@ -1,4 +1,5 @@
 """Validate the staged, unsubmitted official F-Droid metadata candidate offline."""
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -41,11 +42,41 @@ class FdroiddataCandidateTests(unittest.TestCase):
             self.assertNotIn(forbidden, text)
         self.assertIn('prepare_sources.py --source-only', self.build['prebuild'][0])
         self.assertIn('prepare_sources.py --gradle-only', self.build['build'][0])
-        self.assertIn('cd .. && make assets', self.build['build'][-2])
+        self.assertEqual(self.build['build'][-2], 'make -C .. assets')
         self.assertIn('bash .cache/gradle/gradle-8.13/bin/gradle -p . --no-daemon', self.build['build'][-1])
         self.assertNotIn('gradlew', self.build['build'][-1])
         self.assertNotIn('cd android', self.build['build'][-1])
         self.assertIn('$$OUT$$', self.build['postbuild'][0])
+
+    def test_fdroid_build_commands_preserve_android_working_directory(self):
+        # F-Droid executes successive build commands in the same shell.
+        # A plain "cd .. && make assets" would break the following relative Gradle path.
+        asset_command, gradle_command = self.build['build'][-2:]
+        self.assertEqual(asset_command, 'make -C .. assets')
+        self.assertTrue(gradle_command.startswith(
+            'bash .cache/gradle/gradle-8.13/bin/gradle -p . --no-daemon '
+        ))
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            android = root / 'android'
+            gradle = android / '.cache/gradle/gradle-8.13/bin/gradle'
+            gradle.parent.mkdir(parents=True)
+            (root / 'Makefile').write_text('assets:\n\t@touch assets.marker\n', encoding='utf-8')
+            gradle.write_text(
+                '#!/usr/bin/env bash\n'
+                'set -euo pipefail\n'
+                '[[ -f ../assets.marker ]]\n'
+                '[[ "$PWD" == "$EXPECTED_ANDROID_CWD" ]]\n',
+                encoding='utf-8',
+            )
+            env = dict(os.environ, EXPECTED_ANDROID_CWD=str(android))
+            result = subprocess.run(
+                ['bash', '-e', '-o', 'pipefail', '-c',
+                 asset_command + '\n' + gradle_command],
+                cwd=android, env=env, capture_output=True, text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((root / 'assets.marker').is_file())
 
     def test_native_flags_and_source_scanner_order(self):
         native = (PATCH_DIR / 'native-paths.patch').read_text(encoding='utf-8')
