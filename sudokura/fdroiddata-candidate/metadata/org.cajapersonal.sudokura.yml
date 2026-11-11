@@ -46,7 +46,8 @@ Builds:
       - python3 scripts/prepare_sources.py --gradle-only
       - echo 'ae7b7855e115a5966d8b1b3f80f254ccc117ec86f9965e202ee2940453837280  /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf' | sha256sum -c -
       - echo '63d3ba759d12804c5b31a9d5940d855c1820d1f5999e6b0872eb1c7ff045fbc9  /usr/share/doc/fonts-dejavu-core/copyright' | sha256sum -c -
-      - cd .. && make assets
+      # Run root asset generation without leaving F-Droid's subdir: android.
+      - make -C .. assets
       # Scanner removes gradlew; invoke the already SHA-256-pinned Gradle 8.13 directly.
       - bash .cache/gradle/gradle-8.13/bin/gradle -p . --no-daemon :app:assembleProductionRelease -PsudokuraFont=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf -PsudokuraFontLicense=/usr/share/doc/fonts-dejavu-core/copyright
     output: app/build/outputs/apk/production/release/app-production-release-unsigned.apk
