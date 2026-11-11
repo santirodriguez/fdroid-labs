@@ -25,10 +25,15 @@ GitHub tag and release actually publish that exact APK; it is not live now.
 3. `prebuild`: fetch and SHA-256 verify the three SDL **source** archives from
    upstream's committed `android/dependencies.lock.json`; extract sources,
    remove the downloads so the F-Droid source scanner can inspect the source
-   trees without archive clutter.
+   trees without archive clutter. `scandelete` removes only nine exact,
+   scanner-flagged non-Android SDL entries (bundled Apple/Xcode binaries and
+   two optional Rust/WebAssembly demo manifests without lockfiles), rather
+   than suppressing scanner errors. All Android CMake sources remain present.
 4. `build`: fetch and verify Gradle 8.13 from the same lock; build deterministic
-   assets with Go; run the checked-out project's Gradle 8.13/AGP 8.11.1
-   productionRelease variant, ARM64/NDK 28.2.13676358, unsigned.
+   assets with Go using `make -C .. assets` to **preserve the `subdir: android` working directory** across F-Droid's persistent build shell; invoke that SHA-256-pinned Gradle distribution **directly**
+   from the declared `subdir: android` (F-Droid's scanner strips `gradlew`),
+   compiling the Gradle 8.13/AGP 8.11.1 productionRelease variant,
+   ARM64/NDK 28.2.13676358, unsigned.
 5. `postbuild`: rewrite ZIP padding in the unsigned APK to the 16-KiB
    `0xd935` extra-field representation produced by Android Build Tools 35.
    Compressed payload bytes are copied unchanged. F-Droid must then use its
@@ -54,8 +59,11 @@ GitHub tag and release actually publish that exact APK; it is not live now.
   actual F-Droid VM can download the SHA-pinned source/Gradle dependencies and
   obtain the exact same font/license/Go/toolchain outputs. The candidate has
   not been tested on that VM; do not label it portable-verified yet.
-- Review license/source policy and scanner output on the staged SDL source
-  archives, bundled FreeType, fonts, audio and icon/flag attribution.
+- Re-run F-Droid scanner against the exact nine-entry `scandelete`
+  allowlist and verify **zero problems** without suppressing any new findings;
+  confirm deletion of those unneeded Apple/WASM files does not alter Android
+  native build output. Review license/source policy and remaining staged SDL
+  sources, bundled FreeType, fonts, audio and icon/flag attribution.
 - Confirm that F-Droid's published `apksigcopier`/`fdroid publish` uses the
   normalized unsigned output in `postbuild` and verifies the true v3 signature.
   The current metadata/patches have been structurally validated only.

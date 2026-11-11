@@ -1,4 +1,5 @@
 """Validate the staged, unsubmitted official F-Droid metadata candidate offline."""
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -41,9 +42,41 @@ class FdroiddataCandidateTests(unittest.TestCase):
             self.assertNotIn(forbidden, text)
         self.assertIn('prepare_sources.py --source-only', self.build['prebuild'][0])
         self.assertIn('prepare_sources.py --gradle-only', self.build['build'][0])
-        self.assertIn('cd .. && make assets', self.build['build'][-2])
-        self.assertIn('cd android && bash gradlew', self.build['build'][-1])
+        self.assertEqual(self.build['build'][-2], 'make -C .. assets')
+        self.assertIn('bash .cache/gradle/gradle-8.13/bin/gradle -p . --no-daemon', self.build['build'][-1])
+        self.assertNotIn('gradlew', self.build['build'][-1])
+        self.assertNotIn('cd android', self.build['build'][-1])
         self.assertIn('$$OUT$$', self.build['postbuild'][0])
+
+    def test_fdroid_build_commands_preserve_android_working_directory(self):
+        # F-Droid executes successive build commands in the same shell.
+        # A plain "cd .. && make assets" would break the following relative Gradle path.
+        asset_command, gradle_command = self.build['build'][-2:]
+        self.assertEqual(asset_command, 'make -C .. assets')
+        self.assertTrue(gradle_command.startswith(
+            'bash .cache/gradle/gradle-8.13/bin/gradle -p . --no-daemon '
+        ))
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            android = root / 'android'
+            gradle = android / '.cache/gradle/gradle-8.13/bin/gradle'
+            gradle.parent.mkdir(parents=True)
+            (root / 'Makefile').write_text('assets:\n\t@touch assets.marker\n', encoding='utf-8')
+            gradle.write_text(
+                '#!/usr/bin/env bash\n'
+                'set -euo pipefail\n'
+                '[[ -f ../assets.marker ]]\n'
+                '[[ "$PWD" == "$EXPECTED_ANDROID_CWD" ]]\n',
+                encoding='utf-8',
+            )
+            env = dict(os.environ, EXPECTED_ANDROID_CWD=str(android))
+            result = subprocess.run(
+                ['bash', '-e', '-o', 'pipefail', '-c',
+                 asset_command + '\n' + gradle_command],
+                cwd=android, env=env, capture_output=True, text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((root / 'assets.marker').is_file())
 
     def test_native_flags_and_source_scanner_order(self):
         native = (PATCH_DIR / 'native-paths.patch').read_text(encoding='utf-8')
@@ -53,6 +86,29 @@ class FdroiddataCandidateTests(unittest.TestCase):
         self.assertIn('set(CMAKE_EXPORT_COMPILE_COMMANDS ON)', native)
         self.assertIn('subset = ["SDL2", "SDL2_ttf", "SDL2_mixer"]', sources)
         self.assertIn('subset = ["Gradle"]', sources)
+
+    def test_scanner_removes_only_known_unused_third_party_files(self):
+        # Exact logs from the no-cache F-Droid 2.4.5 scanner: nine hits.
+        # These paths are outside the source targets used by Android CMake.
+        expected = [
+            'android/.cache/source/SDL2-2.32.10/Xcode/SDL/pkg-support/resources/SDL_DS_Store',
+            'android/.cache/source/SDL2_ttf-2.24.0/Xcode/macOS/SDL2.framework/Versions/A/SDL2',
+            'android/.cache/source/SDL2_ttf-2.24.0/Xcode/iOS/SDL2.framework/SDL2',
+            'android/.cache/source/SDL2_ttf-2.24.0/Xcode/tvOS/SDL2.framework/SDL2',
+            'android/.cache/source/SDL2_ttf-2.24.0/external/harfbuzz/src/wasm/rust/harfbuzz-wasm/Cargo.toml',
+            'android/.cache/source/SDL2_ttf-2.24.0/external/harfbuzz/src/wasm/sample/rust/hello-wasm/Cargo.toml',
+            'android/.cache/source/SDL2_mixer-2.8.1/Xcode/macOS/SDL2.framework/Versions/A/SDL2',
+            'android/.cache/source/SDL2_mixer-2.8.1/Xcode/iOS/SDL2.framework/SDL2',
+            'android/.cache/source/SDL2_mixer-2.8.1/Xcode/tvOS/SDL2.framework/SDL2',
+        ]
+        self.assertEqual(self.build['scandelete'], expected)
+        self.assertNotIn('scanignore', self.build)
+        self.assertEqual(len(expected), len(set(expected)))
+        for path in expected:
+            self.assertTrue(path.startswith('android/.cache/source/'))
+            self.assertNotIn('android/app/', path)
+            self.assertNotIn('/freetype/', path)
+        self.assertTrue(all(path.endswith(('SDL_DS_Store', '/SDL2', 'Cargo.toml')) for path in expected))
 
     def test_16k_padding_patch_rebuilds_unsigned_zip_without_payload_change(self):
         patch = (PATCH_DIR / 'signer35-align.patch').read_text(encoding='utf-8')
