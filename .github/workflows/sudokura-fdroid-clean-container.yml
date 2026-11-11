@@ -1,0 +1,156 @@
+name: Sudokura clean F-Droid candidate in free Docker
+
+# Manual-only, public-owned laboratory. No automatic builds or releases.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sudokura-cold-fdroid-container-candidate
+  cancel-in-progress: false
+
+jobs:
+  clean-container:
+    if: ${{ github.repository == 'santirodriguez/fdroid-labs' && github.event.repository.private == false }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    env:
+      EXPECTED_SOURCE_SHA: b057341c84cd988cd15b3329507aaa6151449f5b
+      EXPECTED_CANDIDATE_SHA: 7c629521898d983f40aefa1b244395848ca874c2
+    steps:
+      - name: Checkout owned laboratory without saved credentials
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          path: lab
+          persist-credentials: false
+
+      - name: Checkout immutable candidate recipe without saved credentials
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: santirodriguez/fdroid-labs
+          ref: 7c629521898d983f40aefa1b244395848ca874c2
+          path: candidate
+          persist-credentials: false
+
+      - name: Checkout exact public Sudokura source without saved credentials
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: santirodriguez/Sudokura
+          ref: b057341c84cd988cd15b3329507aaa6151449f5b
+          path: source
+          persist-credentials: false
+
+      - name: Verify approved revisions, workflow safety and candidate tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C candidate rev-parse HEAD)" = "$EXPECTED_CANDIDATE_SHA"
+          test "$(git -C source rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test "$(git -C source rev-parse HEAD^{tree})" = a0bcecc4bf67a4d3f36c40172dca45dda2e74884
+          test ! -e source/android/.cache
+          python3 -m unittest discover -s candidate/sudokura/tests -p test_fdroiddata_candidate.py -v
+          python3 -m unittest discover -s lab/sudokura/clean-container -p test_*.py -v
+          bash -n lab/sudokura/clean-container/run-clean.sh
+          bash -n lab/sudokura/stage-offline-git.sh
+          test -s candidate/sudokura/repro-check.py
+
+      - name: Set up Java 17 without dependency caches
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Provision Android SDK packages into new temporary directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "DO NOT run on paid runners, third-party infrastructure or private forks"
+          : "This standard public GitHub runner does not need KVM"
+          sdk_root="$RUNNER_TEMP/sudokura-cold-sdk"
+          test ! -e "$sdk_root"
+          mkdir -p "$sdk_root"
+          printf 'SDK_ROOT=%s\n' "$sdk_root" >> "$GITHUB_ENV"
+          test -n "$ANDROID_HOME"
+          manager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          test -x "$manager"
+          (yes || true) | "$manager" --sdk_root="$sdk_root" --licenses >/dev/null
+          "$manager" --sdk_root="$sdk_root" \
+            "platforms;android-36" "build-tools;35.0.0" \
+            "ndk;28.2.13676358" "cmake;3.22.1"
+          test -x "$sdk_root/build-tools/35.0.0/aapt"
+          test -d "$sdk_root/ndk/28.2.13676358"
+          test -d "$sdk_root/platforms/android-36"
+          df -h "$RUNNER_TEMP"
+
+      - name: Stage exact candidate in a fresh local Git mirror
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/sudokura-cold-fdroid"
+          python3 lab/sudokura/clean-container/stage.py \
+            --lab "$PWD/lab" \
+            --candidate "$PWD/candidate" \
+            --source "$PWD/source" \
+            --work "$work"
+          test -s "$work/logs/provenance.txt"
+          test -s "$work/metadata/org.cajapersonal.sudokura.yml"
+          ! grep -q '^[[:space:]]*binary:' "$work/metadata/org.cajapersonal.sudokura.yml"
+
+      - name: Build throwaway fdroidserver 2.4.5 Docker image from clean inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --pull --no-cache \
+            --file lab/sudokura/Dockerfile \
+            --tag sudokura-fdroid-cold:local \
+            lab/sudokura
+
+      - name: Execute disposable source-build and payload check
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/sudokura-cold-fdroid"
+          : "Outbound network is needed for verified SDL/Gradle source and Maven dependencies"
+          : "There are no signing keys, remote write credentials or F-Droid/GitLab operations"
+          docker run --rm --network bridge \
+            --cap-drop ALL --security-opt no-new-privileges \
+            --pids-limit 1024 --memory 12g \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/work/fdroid/home \
+            -e ANDROID_HOME=/opt/android-sdk \
+            -e ANDROID_SDK_ROOT=/opt/android-sdk \
+            -e GRADLE_USER_HOME=/work/fdroid/gradle-home \
+            -v "$work:/work/fdroid:rw" \
+            -v "$SDK_ROOT:/opt/android-sdk:ro" \
+            -w /work/fdroid \
+            sudokura-fdroid-cold:local bash tools/run-clean.sh
+
+      - name: Summarize limited verification without uploading APKs or caches
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/sudokura-cold-fdroid"
+          {
+            echo '# Sudokura 1.4.1 F-Droid clean-container probe'
+            echo
+            echo '- Standard public GitHub runner; no paid machines or artifact uploads'
+            echo '- Container-local source build only: NOT the official F-Droid VM'
+            echo '- GitHub Release signed binary verification: NOT RUN (unpublished)'
+            echo '- Original signing key: NOT USED'
+            echo '- F-Droid/GitLab submission or publication: NOT RUN'
+            echo
+            if [[ -f "$work/logs/provenance.txt" ]]; then
+              echo '## Immutable sources'
+              sed 's/^/- /' "$work/logs/provenance.txt"
+            fi
+            if [[ -f "$work/logs/outcome.txt" ]]; then
+              echo
+              echo '## Command outcomes'
+              sed 's/^/- /' "$work/logs/outcome.txt"
+            else
+              echo '- Build not reached'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
