@@ -51,6 +51,28 @@ class FontPatchTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "Refusing to replace"):
                     mod.stage()
 
+    def test_dns_failover_preserves_strict_archive_hashes(self):
+        from urllib.error import URLError
+        with TemporaryDirectory() as tmp:
+            mod = self.load_patched_module(tmp)
+            self.assertEqual(len(mod.MIRROR_URLS), 3)
+            fixture = b"immutable source package test"
+            digest = hashlib.sha256(fixture).hexdigest()
+
+            class Response:
+                def __enter__(self): return self
+                def __exit__(self, *args): return False
+                def geturl(self): return mod.MIRROR_URLS[1]
+                def read(self, size): return fixture[:size]
+
+            with (
+                patch.object(mod, "ARCHIVE_SIZE", len(fixture)),
+                patch.object(mod, "ARCHIVE_SHA256", digest),
+                patch.object(mod, "urlopen", side_effect=[URLError("DNS unavailable"), Response()]) as opener,
+            ):
+                self.assertEqual(mod.fetch_archive(), fixture)
+                self.assertEqual(opener.call_count, 2)
+
     def test_package_bytes_and_url_redirect_are_verified(self):
         with TemporaryDirectory() as tmp:
             mod = self.load_patched_module(tmp)

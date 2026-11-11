@@ -55,6 +55,32 @@ class PinnedUbuntuFontTests(unittest.TestCase):
             "63d3ba759d12804c5b31a9d5940d855c1820d1f5999e6b0872eb1c7ff045fbc9",
         )
 
+    def test_dns_failover_uses_only_pinned_package(self):
+        from urllib.error import URLError
+        fixture = b"immutable source package test"
+        digest = hashlib.sha256(fixture).hexdigest()
+        response = Response(fixture, font_stage.MIRROR_URLS[1])
+        with (
+            patch.object(font_stage, "ARCHIVE_SIZE", len(fixture)),
+            patch.object(font_stage, "ARCHIVE_SHA256", digest),
+            patch.object(font_stage, "urlopen", side_effect=[URLError("DNS unavailable"), response]) as opener,
+        ):
+            self.assertEqual(font_stage.fetch_pinned_archive(), fixture)
+            self.assertEqual(opener.call_count, 2)
+        self.assertEqual(len(font_stage.MIRROR_URLS), 3)
+
+    def test_does_not_accept_wrong_hash_from_fallback(self):
+        from urllib.error import URLError
+        fixture = b"untrusted package"
+        response = Response(fixture, font_stage.MIRROR_URLS[1])
+        with (
+            patch.object(font_stage, "ARCHIVE_SIZE", len(fixture)),
+            patch.object(font_stage, "urlopen", side_effect=[URLError("DNS unavailable"), response]) as opener,
+        ):
+            with self.assertRaisesRegex(ValueError, "SHA-256 mismatch"):
+                font_stage.fetch_pinned_archive()
+            self.assertEqual(opener.call_count, 2)
+
     def test_wrong_package_bytes_or_redirect_fail_closed(self):
         bad = b"not the Ubuntu package" * 20
         with patch.object(font_stage, "urlopen", return_value=Response(bad, font_stage.ARCHIVE_URL)):

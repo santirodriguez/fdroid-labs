@@ -53,8 +53,10 @@ def check(unsigned_apk):
     if not unsigned_apk.is_file() or unsigned_apk.is_symlink():
         raise ValueError("Missing independent unsigned source-built APK")
     # Candidate postbuild has already restored Android Build Tools 35 ZIP padding.
-    os.environ["APKSIGCOPIER_SKIP_REALIGNMENT"] = "1"
     from fdroidserver import apksigcopier
+    # The vendored Python API consults a module global, not the CLI env flag.
+    # Postbuild has already applied the exact original Android 35 ZIP padding.
+    apksigcopier.skip_realignment = True
     with tempfile.TemporaryDirectory(prefix="sudokura-sigcopy-") as scratch:
         signed = Path(scratch) / "reference.apk"
         reproduced = Path(scratch) / "reproduced.apk"

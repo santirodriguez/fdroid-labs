@@ -2,7 +2,7 @@ diff --git a/android/scripts/fdroid_stage_font.py b/android/scripts/fdroid_stage
 new file mode 100644
 --- /dev/null
 +++ b/android/scripts/fdroid_stage_font.py
-@@ -0,0 +1,86 @@
+@@ -0,0 +1,98 @@
 +#!/usr/bin/env python3
 +"""Stage the exact public-release DejaVu font and license for an F-Droid build.
 +
@@ -25,6 +25,11 @@ new file mode 100644
 +    "https://archive.ubuntu.com/ubuntu/pool/main/f/fonts-dejavu/"
 +    "fonts-dejavu-core_2.37-8_all.deb"
 +)
++MIRROR_URLS = (
++    ARCHIVE_URL,
++    "https://mirrors.edge.kernel.org/ubuntu/pool/main/f/fonts-dejavu/fonts-dejavu-core_2.37-8_all.deb",
++    "https://mirror.linux.duke.edu/pub/ubuntu/pool/main/f/fonts-dejavu/fonts-dejavu-core_2.37-8_all.deb",
++)
 +ARCHIVE_SIZE = 835172
 +ARCHIVE_SHA256 = "40049660c194f3b8a2541fc7369efebb10e9f94bdac836a2f38fafedd10fa73a"
 +FONT_SHA256 = "ae7b7855e115a5966d8b1b3f80f254ccc117ec86f9965e202ee2940453837280"
@@ -42,15 +47,22 @@ new file mode 100644
 +
 +
 +def fetch_archive():
-+    with urlopen(Request(ARCHIVE_URL, headers={"User-Agent": "Sudokura-FDroid/1"}), timeout=45) as response:
-+        if response.geturl() != ARCHIVE_URL:
-+            raise ValueError("Unexpected package redirect")
-+        payload = response.read(ARCHIVE_SIZE + 1)
-+    if len(payload) != ARCHIVE_SIZE:
-+        raise ValueError("Unexpected original font package size")
-+    if hashlib.sha256(payload).hexdigest() != ARCHIVE_SHA256:
-+        raise ValueError("Original font package SHA-256 mismatch")
-+    return payload
++    errors = []
++    for url in MIRROR_URLS:
++        try:
++            with urlopen(Request(url, headers={"User-Agent": "Sudokura-FDroid/1"}), timeout=25) as response:
++                if response.geturl() != url:
++                    raise ValueError("Unexpected package redirect")
++                payload = response.read(ARCHIVE_SIZE + 1)
++        except (URLError, TimeoutError) as exc:
++            errors.append(url + ": " + str(exc))
++            continue
++        if len(payload) != ARCHIVE_SIZE:
++            raise ValueError("Unexpected original font package size")
++        if hashlib.sha256(payload).hexdigest() != ARCHIVE_SHA256:
++            raise ValueError("Original font package SHA-256 mismatch")
++        return payload
++    raise ValueError("All checksum-pinned Ubuntu mirrors were unreachable: " + "; ".join(errors))
 +
 +
 +def stage():

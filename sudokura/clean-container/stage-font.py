@@ -18,6 +18,11 @@ ARCHIVE_URL = (
     "https://archive.ubuntu.com/ubuntu/pool/main/f/fonts-dejavu/"
     "fonts-dejavu-core_2.37-8_all.deb"
 )
+MIRROR_URLS = (
+    ARCHIVE_URL,
+    "https://mirrors.edge.kernel.org/ubuntu/pool/main/f/fonts-dejavu/fonts-dejavu-core_2.37-8_all.deb",
+    "https://mirror.linux.duke.edu/pub/ubuntu/pool/main/f/fonts-dejavu/fonts-dejavu-core_2.37-8_all.deb",
+)
 ARCHIVE_SIZE = 835172
 ARCHIVE_SHA256 = "40049660c194f3b8a2541fc7369efebb10e9f94bdac836a2f38fafedd10fa73a"
 
@@ -50,20 +55,26 @@ def verify_pair(font, license_file):
 
 
 def fetch_pinned_archive():
-    request = Request(
-        ARCHIVE_URL,
-        headers={"User-Agent": "Sudokura-fdroid-lab-font-verifier/1"},
-    )
-    with urlopen(request, timeout=45) as response:
-        if response.geturl() != ARCHIVE_URL:
-            raise ValueError("Unexpected redirect while downloading Ubuntu package")
-        content = response.read(ARCHIVE_SIZE + 1)
-    if len(content) != ARCHIVE_SIZE:
-        raise ValueError("Ubuntu .deb has an unexpected size")
-    actual = sha256(content)
-    if actual != ARCHIVE_SHA256:
-        raise ValueError("Official Ubuntu package SHA-256 mismatch: " + actual)
-    return content
+    errors = []
+    for url in MIRROR_URLS:
+        request = Request(
+            url, headers={"User-Agent": "Sudokura-fdroid-lab-font-verifier/1"}
+        )
+        try:
+            with urlopen(request, timeout=25) as response:
+                if response.geturl() != url:
+                    raise ValueError("Unexpected redirect while downloading Ubuntu package")
+                content = response.read(ARCHIVE_SIZE + 1)
+        except (URLError, TimeoutError) as exc:
+            errors.append(url + ": " + str(exc))
+            continue
+        if len(content) != ARCHIVE_SIZE:
+            raise ValueError("Ubuntu .deb has an unexpected size")
+        actual = sha256(content)
+        if actual != ARCHIVE_SHA256:
+            raise ValueError("Official Ubuntu package SHA-256 mismatch: " + actual)
+        return content
+    raise ValueError("All checksum-pinned Ubuntu mirrors were unreachable: " + "; ".join(errors))
 
 
 def stage(work):
