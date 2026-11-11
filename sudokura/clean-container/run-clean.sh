@@ -14,7 +14,7 @@ on_exit() {
   if (( code != 0 )); then
     printf 'result=FAILED exit=%s\n' "$code" >> logs/outcome.txt
     echo 'CLEAN CONTAINER PROBE FAILED. Diagnostic log excerpts:' >&2
-    for log in logs/readmeta.log logs/lint.log logs/scanner.log logs/build.log; do
+    for log in logs/readmeta.log logs/lint.log logs/scanner.log logs/build.log logs/buildlog.log; do
       if [[ -f "$log" ]]; then
         printf '\n--- %s (last 90 lines) ---\n' "$log" >&2
         tail -n 90 "$log" >&2
@@ -124,10 +124,10 @@ echo 'Scanner verified zero reported problems'
 run_check build fdroid build --stop --test --no-refresh --no-tarball "$app:2"
 apk="tmp/$app"_2.apk
 [[ -s "$apk" ]] || { echo 'Expected unsigned APK missing' >&2; exit 4; }
-if grep -Eiq '(^|[[:space:]])(WARNING|ERROR|CRITICAL|Traceback)' logs/build.log; then
-  echo 'Build logged warning/error that requires review' >&2
-  exit 4
-fi
+# Local --test mode skips recipe sudo commands that are reserved for the
+# official F-Droid buildserver. Accept ONLY that exact known warning when
+# the build log confirms those commands were skipped, never new warnings.
+run_check buildlog python3 tools/check-build-log.py logs/build.log
 badging="$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk")"
 grep -Fq "package: name='$app' versionCode='2' versionName='1.4.1'" <<< "$badging" || {
   echo 'Unexpected rebuilt Android application identity' >&2; exit 4;
