@@ -30,7 +30,7 @@ GitHub tag and release actually publish that exact APK; it is not live now.
    two optional Rust/WebAssembly demo manifests without lockfiles), rather
    than suppressing scanner errors. All Android CMake sources remain present.
 4. `build`: fetch and verify Gradle 8.13 from the same lock; build deterministic
-   assets with Go; invoke that SHA-256-pinned Gradle distribution **directly**
+   assets with Go using `make -C .. assets` to **preserve the `subdir: android` working directory** across F-Droid's persistent build shell; invoke that SHA-256-pinned Gradle distribution **directly**
    from the declared `subdir: android` (F-Droid's scanner strips `gradlew`),
    compiling the Gradle 8.13/AGP 8.11.1 productionRelease variant,
    ARM64/NDK 28.2.13676358, unsigned.
