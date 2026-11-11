@@ -91,9 +91,9 @@ run_check() {
 # fetch (source checkout uses the verified local mirror).
 run_check readmeta fdroid readmeta
 run_check lint fdroid lint "$app"
-# Check the Debian-container font and its copyright independently.
-# Different bytes are an actionable portability failure, never a reason to
-# substitute the previous lab's prewarmed Ubuntu font.
+# Re-check the exact original Ubuntu font and copyright at the canonical
+# paths AFTER read-only Docker mounting. A mismatch blocks the source build;
+# the previously established expected SHA-256 values are never changed.
 python3 tools/repro-check.py font \
   /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf \
   /usr/share/doc/fonts-dejavu-core/copyright
