@@ -29,7 +29,7 @@ class FdroiddataCandidateTests(unittest.TestCase):
         self.assertEqual(self.metadata['AutoName'], 'Sudokura')
         self.assertEqual(
             self.metadata['Changelog'],
-            'https://github.com/santirodriguez/Sudokura/blob/main/CHANGELOG.md'
+            'https://github.com/santirodriguez/Sudokura/blob/HEAD/CHANGELOG.md'
         )
 
     def test_source_binary_and_original_signer_identity(self):

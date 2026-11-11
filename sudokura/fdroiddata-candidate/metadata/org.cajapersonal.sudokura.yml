@@ -7,7 +7,7 @@ WebSite: https://sudokura.cajapersonal.org/
 AutoName: Sudokura
 SourceCode: https://github.com/santirodriguez/Sudokura
 IssueTracker: https://github.com/santirodriguez/Sudokura/issues
-Changelog: https://github.com/santirodriguez/Sudokura/blob/main/CHANGELOG.md
+Changelog: https://github.com/santirodriguez/Sudokura/blob/HEAD/CHANGELOG.md
 RepoType: git
 Repo: https://github.com/santirodriguez/Sudokura.git
 AllowedAPKSigningKeys: fde951e3d2ef42e41c7186ee965944aeca549d590ad080711dd3d875f82df66d
