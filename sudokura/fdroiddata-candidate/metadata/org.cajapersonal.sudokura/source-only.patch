@@ -1,0 +1,15 @@
+diff --git a/android/scripts/prepare_sources.py b/android/scripts/prepare_sources.py
+--- a/android/scripts/prepare_sources.py
++++ b/android/scripts/prepare_sources.py
+@@ -1,5 +1,10 @@
+ def main():
+     lock = json.loads(LOCK.read_text())
+-    subset = ["Gradle"] if "--gradle-only" in sys.argv[1:] else list(lock)
++    if "--source-only" in sys.argv[1:]:
++        subset = ["SDL2", "SDL2_ttf", "SDL2_mixer"]
++    elif "--gradle-only" in sys.argv[1:]:
++        subset = ["Gradle"]
++    else:
++        subset = list(lock)
+     for name in subset:
+         prepare(name, lock[name])

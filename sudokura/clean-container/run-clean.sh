@@ -135,10 +135,11 @@ grep -Fq "package: name='$app' versionCode='2' versionName='1.4.1'" <<< "$badgin
 
 # The prior original-signed APK's 28 non-signature content hashes are
 # independently retained in the immutable probe revision (not build inputs).
-# This does not perform APK v3 signature copying or upstream verification.
+# Payload parity is necessary but not sufficient for upstream-signed reproduction.
 run_check payload python3 tools/repro-check.py apk "$apk" logs/repro-payload.json
+run_check signature_copy python3 tools/verify-signature-copy.py "$apk"
 
-printf 'result=CLEAN_CONTAINER_SOURCE_BUILD_AND_PAYLOAD_PASS\n' >> logs/outcome.txt
-printf 'binary_verification=NOT_RUN_GITHUB_RELEASE_UNPUBLISHED\n' >> logs/outcome.txt
+printf 'result=CLEAN_CONTAINER_SOURCE_BUILD_AND_SIGNATURE_COPY_PASS\n' >> logs/outcome.txt
+printf 'binary_verification=ORIGINAL_SIGNED_APK_BYTE_IDENTICAL\n' >> logs/outcome.txt
 sha256sum "$apk" | tee logs/rebuilt-unsigned-sha256.txt
-echo 'CLEAN CONTAINER PASS (not official buildserver VM and not signature acceptance)'
+echo 'CLEAN CONTAINER PASS (original-signed signature copy matched; NOT official F-Droid VM acceptance)'

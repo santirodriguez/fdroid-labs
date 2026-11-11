@@ -1,0 +1,91 @@
+diff --git a/android/scripts/fdroid_stage_font.py b/android/scripts/fdroid_stage_font.py
+new file mode 100644
+--- /dev/null
++++ b/android/scripts/fdroid_stage_font.py
+@@ -0,0 +1,86 @@
++#!/usr/bin/env python3
++"""Stage the exact public-release DejaVu font and license for an F-Droid build.
++
++Only a checksum-pinned Ubuntu package is used as input. It is extracted into
++this disposable source checkout; no system fonts or files are overwritten.
++"""
++import hashlib
++from pathlib import Path
++import shutil
++import subprocess
++import sys
++import tempfile
++from urllib.error import URLError
++from urllib.request import Request, urlopen
++
++ANDROID = Path(__file__).resolve().parents[1]
++CACHE = ANDROID / ".cache"
++DESTINATION = CACHE / "fdroid-font"
++ARCHIVE_URL = (
++    "https://archive.ubuntu.com/ubuntu/pool/main/f/fonts-dejavu/"
++    "fonts-dejavu-core_2.37-8_all.deb"
++)
++ARCHIVE_SIZE = 835172
++ARCHIVE_SHA256 = "40049660c194f3b8a2541fc7369efebb10e9f94bdac836a2f38fafedd10fa73a"
++FONT_SHA256 = "ae7b7855e115a5966d8b1b3f80f254ccc117ec86f9965e202ee2940453837280"
++LICENSE_SHA256 = "63d3ba759d12804c5b31a9d5940d855c1820d1f5999e6b0872eb1c7ff045fbc9"
++FONT_REL = Path("usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
++LICENSE_REL = Path("usr/share/doc/fonts-dejavu-core/copyright")
++
++
++def verify_file(path, expected):
++    if not path.is_file() or path.is_symlink():
++        raise ValueError("Missing or unsafe input: " + str(path))
++    observed = hashlib.sha256(path.read_bytes()).hexdigest()
++    if observed != expected:
++        raise ValueError("SHA-256 mismatch for " + path.name + ": " + observed)
++
++
++def fetch_archive():
++    with urlopen(Request(ARCHIVE_URL, headers={"User-Agent": "Sudokura-FDroid/1"}), timeout=45) as response:
++        if response.geturl() != ARCHIVE_URL:
++            raise ValueError("Unexpected package redirect")
++        payload = response.read(ARCHIVE_SIZE + 1)
++    if len(payload) != ARCHIVE_SIZE:
++        raise ValueError("Unexpected original font package size")
++    if hashlib.sha256(payload).hexdigest() != ARCHIVE_SHA256:
++        raise ValueError("Original font package SHA-256 mismatch")
++    return payload
++
++
++def stage():
++    if not CACHE.is_dir() or CACHE.is_symlink():
++        raise ValueError("The verified source cache must exist first")
++    if DESTINATION.exists() or DESTINATION.is_symlink():
++        raise ValueError("Refusing to replace an existing staged font")
++    with tempfile.TemporaryDirectory(prefix="original-font-", dir=CACHE) as tmp:
++        work = Path(tmp)
++        archive = work / "font.deb"
++        archive.write_bytes(fetch_archive())
++        verify_file(archive, ARCHIVE_SHA256)
++        extracted = work / "extracted"
++        subprocess.run(["dpkg-deb", "--extract", str(archive), str(extracted)],
++                       check=True, capture_output=True, text=True, timeout=90)
++        original_font, original_license = extracted / FONT_REL, extracted / LICENSE_REL
++        verify_file(original_font, FONT_SHA256)
++        verify_file(original_license, LICENSE_SHA256)
++        selected = work / "selected"
++        selected.mkdir()
++        font, license_file = selected / "DejaVuSans.ttf", selected / "copyright"
++        shutil.copyfile(original_font, font)
++        shutil.copyfile(original_license, license_file)
++        verify_file(font, FONT_SHA256)
++        verify_file(license_file, LICENSE_SHA256)
++        font.chmod(0o444)
++        license_file.chmod(0o444)
++        selected.rename(DESTINATION)
++    print("Pinned original DejaVu font and license: PASS")
++
++
++if __name__ == "__main__":
++    try:
++        stage()
++    except (OSError, ValueError, URLError, subprocess.CalledProcessError,
++            subprocess.TimeoutExpired) as exc:
++        print("Pinned font staging failed: " + str(exc), file=sys.stderr)
++        sys.exit(1)

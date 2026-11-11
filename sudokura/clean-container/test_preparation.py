@@ -47,7 +47,7 @@ class ContainerCandidateTests(unittest.TestCase):
         self.assertIn("github.event.repository.private == false", content)
         self.assertIn("permissions:\n  contents: read", content)
         self.assertIn("timeout-minutes: 55", content)
-        self.assertIn(stage.CANDIDATE_SHA, content)
+        self.assertIn("EXPECTED_CANDIDATE_SHA: ${{ github.sha }}", content)
         self.assertIn(stage.SOURCE_SHA, content)
         self.assertEqual(content.count("persist-credentials: false"), 3)
         self.assertIn("--network bridge", content)
@@ -62,11 +62,11 @@ class ContainerCandidateTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, content)
 
-    def test_revised_candidate_pin_is_coherent(self):
-        self.assertEqual(stage.CANDIDATE_SHA, "6e5225bee3d4976eeaf3acff7bc56cd0d98d25b5")
+    def test_dispatched_candidate_sha_is_exactly_pinned(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
-        self.assertEqual(workflow.count(stage.CANDIDATE_SHA), 2)
-        self.assertIn("ref: " + stage.CANDIDATE_SHA, workflow)
+        self.assertIn("EXPECTED_CANDIDATE_SHA: ${{ github.sha }}", workflow)
+        self.assertIn("ref: ${{ github.sha }}", workflow)
+        self.assertIn("re.fullmatch", (HERE / "stage.py").read_text(encoding="utf-8"))
 
     def test_fdroid_patch_tool_is_available_before_scanning(self):
         dockerfile = (ROOT / "sudokura" / "Dockerfile").read_text(encoding="utf-8")

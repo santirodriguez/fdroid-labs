@@ -1,0 +1,136 @@
+diff --git a/android/scripts/fdroid_align_16k.py b/android/scripts/fdroid_align_16k.py
+new file mode 100644
+--- /dev/null
++++ b/android/scripts/fdroid_align_16k.py
+@@ -0,0 +1,131 @@
++#!/usr/bin/env python3
++"""Recreate APK signer 35's 16-KiB ZIP alignment on an unsigned APK.
++
++Used only for the F-Droid source-built candidate; never applies a signature.
++Raw compressed member bytes are copied without recompression.
++"""
++# SPDX-License-Identifier: GPL-3.0-or-later
++# Alignment procedure derived from apksigcopier v1.1.1, FC Stegerman.
++# https://github.com/obfusk/apksigcopier
++import os
++import struct
++import sys
++import tempfile
++import zipfile
++from pathlib import Path
++
++
++def u16(data):
++    return struct.unpack('<H', data)[0]
++
++
++def end_records(stream):
++    stream.seek(0, os.SEEK_END)
++    end = stream.tell()
++    stream.seek(max(0, end - 65557))
++    tail = stream.read()
++    index = tail.rfind(b'PK\x05\x06')
++    if index < 0:
++        raise ValueError('Missing APK end of central directory')
++    eocd = tail[index:]
++    if len(eocd) < 22 or len(eocd) != 22 + u16(eocd[20:22]):
++        raise ValueError('Unsupported APK ZIP comment or trailing bytes')
++    return struct.unpack('<I', eocd[16:20])[0], eocd
++
++
++def alignment_extra(extra, name, offset, filename_size):
++    # Remove only old ZIP padding, preserving all non-padding extra fields.
++    kept = bytearray()
++    pos = 0
++    while pos < len(extra):
++        if pos + 4 > len(extra):
++            if any(extra[pos:]):
++                raise ValueError('Unexpected trailing ZIP extra-field bytes')
++            break
++        field_id, size = struct.unpack('<HH', extra[pos:pos + 4])
++        item = extra[pos:pos + 4 + size]
++        if len(item) != 4 + size:
++            raise ValueError('Truncated ZIP extra field')
++        if field_id not in (0, 0xD935):
++            kept.extend(item)
++        pos += 4 + size
++    align = 16384 if name.endswith('.so') else 4
++    length = (align - (offset + 30 + filename_size + len(kept) + 6) % align) % align
++    return bytes(kept) + struct.pack('<HHH', 0xD935, 2 + length, align) + b'\0' * length
++
++
++def rebuild(input_path, output_path):
++    with zipfile.ZipFile(input_path) as archive:
++        files = archive.infolist()
++        if not files or archive.testzip() is not None:
++            raise ValueError('Damaged or empty source APK')
++        if len({item.filename for item in files}) != len(files):
++            raise ValueError('Duplicate source APK ZIP members')
++    offsets = {}
++    with open(input_path, 'rb') as inp, open(output_path, 'wb') as out:
++        cd_offset, original_eocd = end_records(inp)
++        for item in sorted(files, key=lambda e: e.header_offset):
++            inp.seek(item.header_offset)
++            header = inp.read(30)
++            if len(header) != 30 or header[:4] != b'PK\x03\x04':
++                raise ValueError('Invalid source local file header')
++            name_len, extra_len = struct.unpack('<HH', header[26:30])
++            name = inp.read(name_len)
++            extra = inp.read(extra_len)
++            if len(name) != name_len or len(extra) != extra_len:
++                raise ValueError('Truncated local ZIP header')
++            if item.flag_bits & 8:
++                raise ValueError('Unsupported data descriptor')
++            new_extra = alignment_extra(extra, item.filename, out.tell(), name_len) if item.compress_type == 0 else extra
++            if len(new_extra) > 65535:
++                raise ValueError('Excessive extra field length')
++            offsets[item.filename] = out.tell()
++            out.write(header[:28] + struct.pack('<H', len(new_extra)) + name + new_extra)
++            size = item.compress_size
++            while size:
++                chunk = inp.read(min(1024 * 1024, size))
++                if not chunk:
++                    raise ValueError('Truncated source APK entry')
++                out.write(chunk)
++                size -= len(chunk)
++        new_cd = out.tell()
++        inp.seek(cd_offset)
++        for item in files:
++            record = inp.read(46)
++            if len(record) != 46 or record[:4] != b'PK\x01\x02':
++                raise ValueError('Invalid central directory record')
++            n, m, k = struct.unpack('<HHH', record[28:34])
++            extra = inp.read(n + m + k)
++            if len(extra) != n + m + k:
++                raise ValueError('Truncated central directory')
++            out.write(record[:42] + struct.pack('<I', offsets[item.filename]) + record[46:] + extra)
++        new_end = out.tell()
++        count = len(files)
++        if count > 65535:
++            raise ValueError('ZIP64 not supported')
++        out.write(original_eocd[:8] + struct.pack('<HHII', count, count, new_end - new_cd, new_cd) + original_eocd[20:])
++    with zipfile.ZipFile(input_path) as old, zipfile.ZipFile(output_path) as new:
++        if new.testzip() is not None or old.namelist() != new.namelist():
++            raise ValueError('Repacked unsigned APK is not valid')
++        for name in old.namelist():
++            if old.read(name) != new.read(name):
++                raise ValueError('Source payload changed: ' + name)
++
++
++def main():
++    if len(sys.argv) != 2:
++        raise SystemExit('Usage: fdroid_align_16k.py UNSIGNED_APK')
++    target = Path(sys.argv[1])
++    if not target.is_file() or target.is_symlink():
++        raise SystemExit('Expected a regular unsigned APK')
++    handle, temporary = tempfile.mkstemp(prefix='fdroid-aligned-', suffix='.apk', dir=target.parent)
++    os.close(handle)
++    try:
++        rebuild(target, temporary)
++        os.replace(temporary, target)
++    finally:
++        Path(temporary).unlink(missing_ok=True)
++
++
++if __name__ == '__main__':
++    main()

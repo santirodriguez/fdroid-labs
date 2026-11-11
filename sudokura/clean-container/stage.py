@@ -6,6 +6,8 @@ of the NOT-YET-PUBLISHED upstream binary URL. Never alter upstream metadata.
 """
 import argparse
 import hashlib
+import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -14,13 +16,17 @@ import sys
 APP = "org.cajapersonal.sudokura"
 SOURCE_SHA = "b057341c84cd988cd15b3329507aaa6151449f5b"
 SOURCE_TREE = "a0bcecc4bf67a4d3f36c40172dca45dda2e74884"
-CANDIDATE_SHA = "6e5225bee3d4976eeaf3acff7bc56cd0d98d25b5"
+def candidate_revision():
+    value = os.environ.get("EXPECTED_CANDIDATE_SHA", "")
+    if not re.fullmatch(r"[0-9a-f]{40}", value):
+        raise ValueError("Expected exact dispatched candidate commit SHA")
+    return value
 SIGNER_SHA = "fde951e3d2ef42e41c7186ee965944aeca549d590ad080711dd3d875f82df66d"
 BINARY_LINE = (
     "    binary: https://github.com/santirodriguez/Sudokura/releases/download/"
     "v1.4.1/Sudokura-1.4.1-Android-arm64.apk\n"
 )
-PATCHES = ("native-paths.patch", "signer35-align.patch", "source-only.patch")
+PATCHES = ("native-paths.patch", "signer35-align.patch", "source-only.patch", "pinned-font.patch")
 
 
 def git_value(repo, *args):
@@ -59,7 +65,8 @@ def prepare(lab, candidate, source, work):
         raise ValueError("Sudokura source commit mismatch")
     if git_value(source, "rev-parse", "HEAD^{tree}") != SOURCE_TREE:
         raise ValueError("Sudokura source tree mismatch")
-    if git_value(candidate, "rev-parse", "HEAD") != CANDIDATE_SHA:
+    candidate_sha = candidate_revision()
+    if git_value(candidate, "rev-parse", "HEAD") != candidate_sha:
         raise ValueError("Unreviewed F-Droid candidate revision")
     if (source / "android" / ".cache").exists():
         raise ValueError("Sudokura source checkout already contains generated caches")
@@ -71,7 +78,8 @@ def prepare(lab, candidate, source, work):
     stage_tool = lab / "sudokura" / "stage-offline-git.sh"
     run_tool = lab / "sudokura" / "clean-container" / "run-clean.sh"
     build_log_tool = lab / "sudokura" / "clean-container" / "check-build-log.py"
-    for file in [meta_path, ref_tool, stage_tool, run_tool, build_log_tool] + [
+    copy_check_tool = lab / "sudokura" / "clean-container" / "verify-signature-copy.py"
+    for file in [meta_path, ref_tool, stage_tool, run_tool, build_log_tool, copy_check_tool] + [
         patch_dir / name for name in PATCHES
     ]:
         if not file.is_file() or file.is_symlink():
@@ -100,6 +108,7 @@ def prepare(lab, candidate, source, work):
     shutil.copyfile(ref_tool, work / "tools" / "repro-check.py")
     shutil.copyfile(run_tool, work / "tools" / "run-clean.sh")
     shutil.copyfile(build_log_tool, work / "tools" / "check-build-log.py")
+    shutil.copyfile(copy_check_tool, work / "tools" / "verify-signature-copy.py")
 
     (work / "config.yml").write_text(
         "sdk_path: /opt/android-sdk\n"
@@ -114,18 +123,18 @@ def prepare(lab, candidate, source, work):
     (work / "logs" / "provenance.txt").write_text(
         "source_sha=" + SOURCE_SHA + "\n"
         "source_tree=" + SOURCE_TREE + "\n"
-        "candidate_sha=" + CANDIDATE_SHA + "\n"
+        "candidate_sha=" + candidate_sha + "\n"
         "candidate_metadata_sha256=" + sha256(meta_path) + "\n"
         "local_metadata_sha256=" + sha256(local_meta) + "\n"
         "original_signer_certificate_sha256=" + SIGNER_SHA + "\n"
-        "binary_url=TEST_ONLY_OMITTED_UNPUBLISHED\n"
+        "binary_url=TEST_ONLY_OMITTED_FOR_ISOLATED_BUILD\n"
         "vm_equivalence=NOT_TESTED\n"
         "apk_signing=NOT_RUN\n"
         "third_party_submission=NOT_RUN\n",
         encoding="utf-8",
     )
-    print("Staged exact-source local Git mirror and three candidate patches")
-    print("Original signer fingerprint preserved; unpublished binary URL disabled only in scratch")
+    print("Staged exact-source local Git mirror and four candidate patches")
+    print("Original signer fingerprint preserved; public binary URL omitted from scratch build only")
 
 
 def main():

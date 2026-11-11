@@ -1,0 +1,21 @@
+diff --git a/android/app/src/main/cpp/CMakeLists.txt b/android/app/src/main/cpp/CMakeLists.txt
+--- a/android/app/src/main/cpp/CMakeLists.txt
++++ b/android/app/src/main/cpp/CMakeLists.txt
+@@ -2,6 +2,17 @@
+ project(SudokuraAndroid C)
+ 
+ get_filename_component(SUDOKURA_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../../../.." ABSOLUTE)
++# Normalize native source paths for a reproducible, original-signed build.
++# Both the application and SDL native targets inherit these flags.
++if("$ENV{ANDROID_HOME}" STREQUAL "")
++  message(FATAL_ERROR "Android SDK location is required for reproducible build")
++endif()
++set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
++add_compile_options(
++  "-ffile-prefix-map=${SUDOKURA_ROOT}=/home/runner/work/Sudokura/Sudokura"
++  "-ffile-prefix-map=$ENV{ANDROID_HOME}=/usr/local/lib/android/sdk"
++  "-fdebug-compilation-dir=/home/runner/work/Sudokura/Sudokura/android/app/.cxx/RelWithDebInfo/61k4uzg3/arm64-v8a"
++)
+ set(DEPS "${SUDOKURA_ROOT}/android/.cache/source")
+ set(SDL_SRC "${DEPS}/SDL2-2.32.10")
+ set(TTF_SRC "${DEPS}/SDL2_ttf-2.24.0")

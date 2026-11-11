@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 55
     env:
       EXPECTED_SOURCE_SHA: b057341c84cd988cd15b3329507aaa6151449f5b
-      EXPECTED_CANDIDATE_SHA: 6e5225bee3d4976eeaf3acff7bc56cd0d98d25b5
+      EXPECTED_CANDIDATE_SHA: ${{ github.sha }}
     steps:
       - name: Checkout owned laboratory without saved credentials
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           repository: santirodriguez/fdroid-labs
-          ref: 6e5225bee3d4976eeaf3acff7bc56cd0d98d25b5
+          ref: ${{ github.sha }}
           path: candidate
           persist-credentials: false
 
@@ -50,7 +50,7 @@ jobs:
           test "$(git -C source rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
           test "$(git -C source rev-parse HEAD^{tree})" = a0bcecc4bf67a4d3f36c40172dca45dda2e74884
           test ! -e source/android/.cache
-          python3 -m unittest discover -s candidate/sudokura/tests -p test_fdroiddata_candidate.py -v
+          python3 -m unittest discover -s candidate/sudokura/tests -p "test_fdroid*.py" -v
           python3 -m unittest discover -s lab/sudokura/clean-container -p test_*.py -v
           bash -n lab/sudokura/clean-container/run-clean.sh
           bash -n lab/sudokura/stage-offline-git.sh
@@ -150,7 +150,7 @@ jobs:
             echo
             echo '- Standard public GitHub runner; no paid machines or artifact uploads'
             echo '- Container-local source build only: NOT the official F-Droid VM'
-            echo '- GitHub Release signed binary verification: NOT RUN (unpublished)'
+            echo '- Original release APK: signature copy independently verified only when job PASS'
             echo '- Original signing key: NOT USED'
             echo '- F-Droid/GitLab submission or publication: NOT RUN'
             echo
