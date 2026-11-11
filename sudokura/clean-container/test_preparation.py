@@ -67,7 +67,7 @@ class ContainerCandidateTests(unittest.TestCase):
         package_list = dockerfile.split("apt-get install -y --no-install-recommends", 1)[1].split(
             "&& rm -rf", 1
         )[0]
-        self.assertRegex(package_list, r"(?<![\\w-])patch(?![\\w-])")
+        self.assertRegex(package_list, r"(?<![\w-])patch(?![\w-])")
 
         script = RUN.read_text(encoding="utf-8")
         self.assertIn("command -v patch >/dev/null 2>&1", script)
