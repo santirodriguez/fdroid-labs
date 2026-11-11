@@ -14,7 +14,7 @@ on_exit() {
   if (( code != 0 )); then
     printf 'result=FAILED exit=%s\n' "$code" >> logs/outcome.txt
     echo 'CLEAN CONTAINER PROBE FAILED. Diagnostic log excerpts:' >&2
-    for log in logs/readmeta.log logs/lint.log logs/scanner.log logs/build.log logs/buildlog.log; do
+    for log in logs/readmeta.log logs/lint.log logs/scanner.log logs/build.log logs/buildlog.log logs/signature_copy.log; do
       if [[ -f "$log" ]]; then
         printf '\n--- %s (last 90 lines) ---\n' "$log" >&2
         tail -n 90 "$log" >&2
