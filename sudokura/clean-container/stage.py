@@ -70,7 +70,8 @@ def prepare(lab, candidate, source, work):
     ref_tool = candidate / "sudokura" / "repro-check.py"
     stage_tool = lab / "sudokura" / "stage-offline-git.sh"
     run_tool = lab / "sudokura" / "clean-container" / "run-clean.sh"
-    for file in [meta_path, ref_tool, stage_tool, run_tool] + [
+    build_log_tool = lab / "sudokura" / "clean-container" / "check-build-log.py"
+    for file in [meta_path, ref_tool, stage_tool, run_tool, build_log_tool] + [
         patch_dir / name for name in PATCHES
     ]:
         if not file.is_file() or file.is_symlink():
@@ -98,6 +99,7 @@ def prepare(lab, candidate, source, work):
         shutil.copyfile(patch_dir / name, output_patches / name)
     shutil.copyfile(ref_tool, work / "tools" / "repro-check.py")
     shutil.copyfile(run_tool, work / "tools" / "run-clean.sh")
+    shutil.copyfile(build_log_tool, work / "tools" / "check-build-log.py")
 
     (work / "config.yml").write_text(
         "sdk_path: /opt/android-sdk\n"
