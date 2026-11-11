@@ -14,7 +14,7 @@ import sys
 APP = "org.cajapersonal.sudokura"
 SOURCE_SHA = "b057341c84cd988cd15b3329507aaa6151449f5b"
 SOURCE_TREE = "a0bcecc4bf67a4d3f36c40172dca45dda2e74884"
-CANDIDATE_SHA = "9e2d945d492ce7057f1f02e19e60eb4d6bcff050"
+CANDIDATE_SHA = "6e5225bee3d4976eeaf3acff7bc56cd0d98d25b5"
 SIGNER_SHA = "fde951e3d2ef42e41c7186ee965944aeca549d590ad080711dd3d875f82df66d"
 BINARY_LINE = (
     "    binary: https://github.com/santirodriguez/Sudokura/releases/download/"
