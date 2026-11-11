@@ -42,7 +42,9 @@ class FdroiddataCandidateTests(unittest.TestCase):
         self.assertIn('prepare_sources.py --source-only', self.build['prebuild'][0])
         self.assertIn('prepare_sources.py --gradle-only', self.build['build'][0])
         self.assertIn('cd .. && make assets', self.build['build'][-2])
-        self.assertIn('cd android && bash gradlew', self.build['build'][-1])
+        self.assertIn('bash .cache/gradle/gradle-8.13/bin/gradle -p . --no-daemon', self.build['build'][-1])
+        self.assertNotIn('gradlew', self.build['build'][-1])
+        self.assertNotIn('cd android', self.build['build'][-1])
         self.assertIn('$$OUT$$', self.build['postbuild'][0])
 
     def test_native_flags_and_source_scanner_order(self):
@@ -53,6 +55,29 @@ class FdroiddataCandidateTests(unittest.TestCase):
         self.assertIn('set(CMAKE_EXPORT_COMPILE_COMMANDS ON)', native)
         self.assertIn('subset = ["SDL2", "SDL2_ttf", "SDL2_mixer"]', sources)
         self.assertIn('subset = ["Gradle"]', sources)
+
+    def test_scanner_removes_only_known_unused_third_party_files(self):
+        # Exact logs from the no-cache F-Droid 2.4.5 scanner: nine hits.
+        # These paths are outside the source targets used by Android CMake.
+        expected = [
+            'android/.cache/source/SDL2-2.32.10/Xcode/SDL/pkg-support/resources/SDL_DS_Store',
+            'android/.cache/source/SDL2_ttf-2.24.0/Xcode/macOS/SDL2.framework/Versions/A/SDL2',
+            'android/.cache/source/SDL2_ttf-2.24.0/Xcode/iOS/SDL2.framework/SDL2',
+            'android/.cache/source/SDL2_ttf-2.24.0/Xcode/tvOS/SDL2.framework/SDL2',
+            'android/.cache/source/SDL2_ttf-2.24.0/external/harfbuzz/src/wasm/rust/harfbuzz-wasm/Cargo.toml',
+            'android/.cache/source/SDL2_ttf-2.24.0/external/harfbuzz/src/wasm/sample/rust/hello-wasm/Cargo.toml',
+            'android/.cache/source/SDL2_mixer-2.8.1/Xcode/macOS/SDL2.framework/Versions/A/SDL2',
+            'android/.cache/source/SDL2_mixer-2.8.1/Xcode/iOS/SDL2.framework/SDL2',
+            'android/.cache/source/SDL2_mixer-2.8.1/Xcode/tvOS/SDL2.framework/SDL2',
+        ]
+        self.assertEqual(self.build['scandelete'], expected)
+        self.assertNotIn('scanignore', self.build)
+        self.assertEqual(len(expected), len(set(expected)))
+        for path in expected:
+            self.assertTrue(path.startswith('android/.cache/source/'))
+            self.assertNotIn('android/app/', path)
+            self.assertNotIn('/freetype/', path)
+        self.assertTrue(all(path.endswith(('.DS_Store', '/SDL2', 'Cargo.toml')) for path in expected))
 
     def test_16k_padding_patch_rebuilds_unsigned_zip_without_payload_change(self):
         patch = (PATCH_DIR / 'signer35-align.patch').read_text(encoding='utf-8')
