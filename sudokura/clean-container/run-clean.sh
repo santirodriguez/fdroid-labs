@@ -62,6 +62,11 @@ fi
   echo 'Missing compile SDK 36' >&2; exit 2;
 }
 
+# F-Droid applies metadata patches while scanning and building sources.
+command -v patch >/dev/null 2>&1 || {
+  echo 'Missing patch executable required by F-Droid metadata' >&2; exit 2;
+}
+
 {
   printf 'source_sha=%s\n' "$source_sha"
   printf 'execution=fresh_disposable_Docker_container_with_public_dependency_downloads\n'
