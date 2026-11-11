@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 55
     env:
       EXPECTED_SOURCE_SHA: b057341c84cd988cd15b3329507aaa6151449f5b
-      EXPECTED_CANDIDATE_SHA: 7c629521898d983f40aefa1b244395848ca874c2
+      EXPECTED_CANDIDATE_SHA: 6e5225bee3d4976eeaf3acff7bc56cd0d98d25b5
     steps:
       - name: Checkout owned laboratory without saved credentials
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           repository: santirodriguez/fdroid-labs
-          ref: 7c629521898d983f40aefa1b244395848ca874c2
+          ref: 6e5225bee3d4976eeaf3acff7bc56cd0d98d25b5
           path: candidate
           persist-credentials: false
 

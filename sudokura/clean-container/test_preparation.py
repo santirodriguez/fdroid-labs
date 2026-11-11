@@ -62,6 +62,12 @@ class ContainerCandidateTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, content)
 
+    def test_revised_candidate_pin_is_coherent(self):
+        self.assertEqual(stage.CANDIDATE_SHA, "6e5225bee3d4976eeaf3acff7bc56cd0d98d25b5")
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        self.assertEqual(workflow.count(stage.CANDIDATE_SHA), 2)
+        self.assertIn("ref: " + stage.CANDIDATE_SHA, workflow)
+
     def test_fdroid_patch_tool_is_available_before_scanning(self):
         dockerfile = (ROOT / "sudokura" / "Dockerfile").read_text(encoding="utf-8")
         package_list = dockerfile.split("apt-get install -y --no-install-recommends", 1)[1].split(
@@ -82,6 +88,14 @@ class ContainerCandidateTests(unittest.TestCase):
         self.assertIn('fdroid scanner -v "$app:2"', content)
         self.assertIn("fdroid build --stop --test --no-refresh --no-tarball", content)
         self.assertIn("tools/repro-check.py apk", content)
+        self.assertIn("scanner_command=EXIT_ZERO", content)
+        self.assertIn("scanner=PASS_ZERO_PROBLEMS", content)
+        self.assertIn("run_check buildlog python3 tools/check-build-log.py logs/build.log", content)
+        staging = (HERE / "stage.py").read_text(encoding="utf-8")
+        self.assertIn('shutil.copyfile(build_log_tool, work / "tools" / "check-build-log.py")',
+                      staging)
+        self.assertLess(content.index("Scanner did not explicitly report zero problems"),
+                        content.index("scanner=PASS_ZERO_PROBLEMS"))
         for forbidden in ("fdroid publish ", "fdroid update ", "fdroid deploy ",
                           "apksigner sign", "git push "):
             self.assertNotIn(forbidden, content)

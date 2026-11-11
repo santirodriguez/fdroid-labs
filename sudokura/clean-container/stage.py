@@ -14,7 +14,7 @@ import sys
 APP = "org.cajapersonal.sudokura"
 SOURCE_SHA = "b057341c84cd988cd15b3329507aaa6151449f5b"
 SOURCE_TREE = "a0bcecc4bf67a4d3f36c40172dca45dda2e74884"
-CANDIDATE_SHA = "7c629521898d983f40aefa1b244395848ca874c2"
+CANDIDATE_SHA = "6e5225bee3d4976eeaf3acff7bc56cd0d98d25b5"
 SIGNER_SHA = "fde951e3d2ef42e41c7186ee965944aeca549d590ad080711dd3d875f82df66d"
 BINARY_LINE = (
     "    binary: https://github.com/santirodriguez/Sudokura/releases/download/"
@@ -70,7 +70,8 @@ def prepare(lab, candidate, source, work):
     ref_tool = candidate / "sudokura" / "repro-check.py"
     stage_tool = lab / "sudokura" / "stage-offline-git.sh"
     run_tool = lab / "sudokura" / "clean-container" / "run-clean.sh"
-    for file in [meta_path, ref_tool, stage_tool, run_tool] + [
+    build_log_tool = lab / "sudokura" / "clean-container" / "check-build-log.py"
+    for file in [meta_path, ref_tool, stage_tool, run_tool, build_log_tool] + [
         patch_dir / name for name in PATCHES
     ]:
         if not file.is_file() or file.is_symlink():
@@ -98,6 +99,7 @@ def prepare(lab, candidate, source, work):
         shutil.copyfile(patch_dir / name, output_patches / name)
     shutil.copyfile(ref_tool, work / "tools" / "repro-check.py")
     shutil.copyfile(run_tool, work / "tools" / "run-clean.sh")
+    shutil.copyfile(build_log_tool, work / "tools" / "check-build-log.py")
 
     (work / "config.yml").write_text(
         "sdk_path: /opt/android-sdk\n"
