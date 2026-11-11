@@ -53,7 +53,13 @@ class FdroiddataCandidateTests(unittest.TestCase):
             self.assertNotIn(forbidden, text)
         self.assertIn('prepare_sources.py --source-only', self.build['prebuild'][0])
         self.assertIn('prepare_sources.py --gradle-only', self.build['build'][0])
-        self.assertEqual(self.build['sudo'], ['echo \'deb https://deb.debian.org/debian bookworm main\' > /etc/apt/sources.list.d/bookworm.list','apt-get update','apt-get install -y golang-go make','apt-get install -y -t bookworm openjdk-17-jdk-headless','update-java-alternatives -s java-1.17.0-openjdk-amd64'])
+        self.assertEqual(self.build['sudo'], [
+            'echo "deb https://deb.debian.org/debian bookworm main" > /etc/apt/sources.list.d/bookworm.list',
+            'apt-get update',
+            'apt-get install -y golang-go make',
+            'apt-get install -y -t bookworm openjdk-17-jdk-headless',
+            'update-java-alternatives -s java-1.17.0-openjdk-amd64',
+        ])
         self.assertEqual(self.build['prebuild'][-1], 'python3 scripts/fdroid_stage_font.py')
         self.assertIn('.cache/fdroid-font/DejaVuSans.ttf', self.build['build'][1])
         self.assertIn('.cache/fdroid-font/copyright', self.build['build'][2])
