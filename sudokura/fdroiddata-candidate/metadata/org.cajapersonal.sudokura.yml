@@ -1,5 +1,5 @@
 Categories:
-  - Games
+  - Puzzle Game
 License: GPL-3.0-only
 AuthorName: Caja Personal
 AuthorWebSite: https://cajapersonal.org/
@@ -20,7 +20,7 @@ Builds:
     ndk: 28.2.13676358
     sudo:
       - apt-get update
-      - apt-get install -y golang-go
+      - apt-get install -y golang-go make
     patch:
       - native-paths.patch
       - signer35-align.patch

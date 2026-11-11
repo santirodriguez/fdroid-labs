@@ -14,7 +14,7 @@ KNOWN_WARNING = (
     "WARNING: org.cajapersonal.sudokura:1.4.1 "
     "runs this on the buildserver with sudo:"
 )
-KNOWN_COMMANDS = "['apt-get update', 'apt-get install -y golang-go']"
+KNOWN_COMMANDS = "['apt-get update', 'apt-get install -y golang-go make']"
 SKIPPED_CONFIRMATION = (
     "These commands were skipped because fdroid build is not running "
     "on a dedicated build server."

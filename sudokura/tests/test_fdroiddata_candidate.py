@@ -27,6 +27,7 @@ class FdroiddataCandidateTests(unittest.TestCase):
         self.assertEqual(self.metadata['AuthorWebSite'], 'https://cajapersonal.org/')
         self.assertEqual(self.metadata['WebSite'], 'https://sudokura.cajapersonal.org/')
         self.assertEqual(self.metadata['AutoName'], 'Sudokura')
+        self.assertEqual(self.metadata['Categories'], ['Puzzle Game'])
         self.assertEqual(
             self.metadata['Changelog'],
             'https://github.com/santirodriguez/Sudokura/blob/HEAD/CHANGELOG.md'
@@ -52,7 +53,7 @@ class FdroiddataCandidateTests(unittest.TestCase):
             self.assertNotIn(forbidden, text)
         self.assertIn('prepare_sources.py --source-only', self.build['prebuild'][0])
         self.assertIn('prepare_sources.py --gradle-only', self.build['build'][0])
-        self.assertEqual(self.build['sudo'], ['apt-get update', 'apt-get install -y golang-go'])
+        self.assertEqual(self.build['sudo'], ['apt-get update', 'apt-get install -y golang-go make'])
         self.assertEqual(self.build['prebuild'][-1], 'python3 scripts/fdroid_stage_font.py')
         self.assertIn('.cache/fdroid-font/DejaVuSans.ttf', self.build['build'][1])
         self.assertIn('.cache/fdroid-font/copyright', self.build['build'][2])

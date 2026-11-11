@@ -11,7 +11,7 @@ spec.loader.exec_module(checker)
 KNOWN_LOCAL_WARNING = (
     "2026-11-11 05:15:28,613 WARNING: "
     "org.cajapersonal.sudokura:1.4.1 runs this on the buildserver with sudo:\n"
-    "\t['apt-get update', 'apt-get install -y golang-go']\n"
+    "\t['apt-get update', 'apt-get install -y golang-go make']\n"
     "These commands were skipped because fdroid build is not running "
     "on a dedicated build server.\n"
 )
@@ -50,6 +50,14 @@ class BuildLogChecks(unittest.TestCase):
             checker.check(KNOWN_LOCAL_WARNING.replace(
                 checker.KNOWN_COMMANDS, "['sudo install something else']"
             ))
+
+    def test_missing_make_install_warning_is_rejected(self):
+        legacy = KNOWN_LOCAL_WARNING.replace(
+            checker.KNOWN_COMMANDS,
+            "['apt-get update', 'apt-get install -y golang-go']",
+        )
+        with self.assertRaisesRegex(ValueError, "approved commands"):
+            checker.check(legacy)
 
     def test_legacy_font_install_warning_is_rejected(self):
         legacy = KNOWN_LOCAL_WARNING.replace(
