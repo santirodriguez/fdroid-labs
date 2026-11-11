@@ -23,6 +23,20 @@ Builds:
       - native-paths.patch
       - signer35-align.patch
       - source-only.patch
+    # Remove only nine unused non-Android SDL extras found by F-Droid's scanner.
+    # Seven bundled Apple/Xcode binary files; two optional Rust WASM demos
+    # lack lock files. SDL_ttf's Android build explicitly disables HarfBuzz.
+    # Use scandelete (not scanignore), and retain all Android build sources.
+    scandelete:
+      - android/.cache/source/SDL2-2.32.10/Xcode/SDL/pkg-support/resources/SDL_DS_Store
+      - android/.cache/source/SDL2_ttf-2.24.0/Xcode/macOS/SDL2.framework/Versions/A/SDL2
+      - android/.cache/source/SDL2_ttf-2.24.0/Xcode/iOS/SDL2.framework/SDL2
+      - android/.cache/source/SDL2_ttf-2.24.0/Xcode/tvOS/SDL2.framework/SDL2
+      - android/.cache/source/SDL2_ttf-2.24.0/external/harfbuzz/src/wasm/rust/harfbuzz-wasm/Cargo.toml
+      - android/.cache/source/SDL2_ttf-2.24.0/external/harfbuzz/src/wasm/sample/rust/hello-wasm/Cargo.toml
+      - android/.cache/source/SDL2_mixer-2.8.1/Xcode/macOS/SDL2.framework/Versions/A/SDL2
+      - android/.cache/source/SDL2_mixer-2.8.1/Xcode/iOS/SDL2.framework/SDL2
+      - android/.cache/source/SDL2_mixer-2.8.1/Xcode/tvOS/SDL2.framework/SDL2
     prebuild:
       # Before source scanning: download and verify native SOURCE archives only.
       - python3 scripts/prepare_sources.py --source-only
@@ -33,7 +47,8 @@ Builds:
       - echo 'ae7b7855e115a5966d8b1b3f80f254ccc117ec86f9965e202ee2940453837280  /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf' | sha256sum -c -
       - echo '63d3ba759d12804c5b31a9d5940d855c1820d1f5999e6b0872eb1c7ff045fbc9  /usr/share/doc/fonts-dejavu-core/copyright' | sha256sum -c -
       - cd .. && make assets
-      - cd android && bash gradlew --no-daemon :app:assembleProductionRelease -PsudokuraFont=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf -PsudokuraFontLicense=/usr/share/doc/fonts-dejavu-core/copyright
+      # Scanner removes gradlew; invoke the already SHA-256-pinned Gradle 8.13 directly.
+      - bash .cache/gradle/gradle-8.13/bin/gradle -p . --no-daemon :app:assembleProductionRelease -PsudokuraFont=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf -PsudokuraFontLicense=/usr/share/doc/fonts-dejavu-core/copyright
     output: app/build/outputs/apk/production/release/app-production-release-unsigned.apk
     postbuild:
       # Normalize Build Tools 35 ZIP local headers; F-Droid then copies the original v3 signature.
