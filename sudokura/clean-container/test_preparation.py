@@ -63,7 +63,7 @@ class ContainerCandidateTests(unittest.TestCase):
             self.assertNotIn(forbidden, content)
 
     def test_revised_candidate_pin_is_coherent(self):
-        self.assertEqual(stage.CANDIDATE_SHA, "9e2d945d492ce7057f1f02e19e60eb4d6bcff050")
+        self.assertEqual(stage.CANDIDATE_SHA, "6e5225bee3d4976eeaf3acff7bc56cd0d98d25b5")
         workflow = WORKFLOW.read_text(encoding="utf-8")
         self.assertEqual(workflow.count(stage.CANDIDATE_SHA), 2)
         self.assertIn("ref: " + stage.CANDIDATE_SHA, workflow)
