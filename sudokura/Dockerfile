@@ -7,7 +7,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
          ca-certificates git make python3 python3-venv python3-pip \
          openjdk-17-jdk-headless fonts-dejavu-core file libmagic1 \
-         unzip zip xz-utils rsync \
+         unzip zip xz-utils rsync patch \
     && rm -rf /var/lib/apt/lists/*
 
 # fdroidserver is fetched solely from PyPI during image preparation, never
