@@ -19,8 +19,11 @@ Builds:
     subdir: android
     ndk: 28.2.13676358
     sudo:
+      - echo "deb https://deb.debian.org/debian bookworm main" > /etc/apt/sources.list.d/bookworm.list
       - apt-get update
       - apt-get install -y golang-go make
+      - apt-get install -y -t bookworm openjdk-17-jdk-headless
+      - update-java-alternatives -s java-1.17.0-openjdk-amd64
     patch:
       - native-paths.patch
       - signer35-align.patch
@@ -53,6 +56,8 @@ Builds:
       # Run root asset generation without leaving F-Droid's subdir: android.
       - make -C .. assets
       # Scanner removes gradlew; invoke the already SHA-256-pinned Gradle 8.13 directly.
+      - export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+      - test -x "$JAVA_HOME/bin/javac"
       - bash .cache/gradle/gradle-8.13/bin/gradle -p . --no-daemon :app:assembleProductionRelease -PsudokuraFont=../.cache/fdroid-font/DejaVuSans.ttf -PsudokuraFontLicense=../.cache/fdroid-font/copyright
     output: app/build/outputs/apk/production/release/app-production-release-unsigned.apk
     postbuild:

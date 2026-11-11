@@ -14,7 +14,7 @@ KNOWN_WARNING = (
     "WARNING: org.cajapersonal.sudokura:1.4.1 "
     "runs this on the buildserver with sudo:"
 )
-KNOWN_COMMANDS = "['apt-get update', 'apt-get install -y golang-go make']"
+KNOWN_COMMANDS = "['echo \"deb https://deb.debian.org/debian bookworm main\" > /etc/apt/sources.list.d/bookworm.list', 'apt-get update', 'apt-get install -y golang-go make', 'apt-get install -y -t bookworm openjdk-17-jdk-headless', 'update-java-alternatives -s java-1.17.0-openjdk-amd64']"
 SKIPPED_CONFIRMATION = (
     "These commands were skipped because fdroid build is not running "
     "on a dedicated build server."

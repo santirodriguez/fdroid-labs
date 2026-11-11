@@ -53,13 +53,15 @@ class FdroiddataCandidateTests(unittest.TestCase):
             self.assertNotIn(forbidden, text)
         self.assertIn('prepare_sources.py --source-only', self.build['prebuild'][0])
         self.assertIn('prepare_sources.py --gradle-only', self.build['build'][0])
-        self.assertEqual(self.build['sudo'], ['apt-get update', 'apt-get install -y golang-go make'])
+        self.assertEqual(self.build['sudo'], ['echo \'deb https://deb.debian.org/debian bookworm main\' > /etc/apt/sources.list.d/bookworm.list','apt-get update','apt-get install -y golang-go make','apt-get install -y -t bookworm openjdk-17-jdk-headless','update-java-alternatives -s java-1.17.0-openjdk-amd64'])
         self.assertEqual(self.build['prebuild'][-1], 'python3 scripts/fdroid_stage_font.py')
         self.assertIn('.cache/fdroid-font/DejaVuSans.ttf', self.build['build'][1])
         self.assertIn('.cache/fdroid-font/copyright', self.build['build'][2])
         self.assertIn('-PsudokuraFont=../.cache/fdroid-font/DejaVuSans.ttf', self.build['build'][-1])
         self.assertIn('-PsudokuraFontLicense=../.cache/fdroid-font/copyright', self.build['build'][-1])
-        self.assertEqual(self.build['build'][-2], 'make -C .. assets')
+        self.assertEqual(self.build['build'][-4], 'make -C .. assets')
+        self.assertEqual(self.build['build'][-3], 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64')
+        self.assertEqual(self.build['build'][-2], 'test -x "$JAVA_HOME/bin/javac"')
         self.assertIn('bash .cache/gradle/gradle-8.13/bin/gradle -p . --no-daemon', self.build['build'][-1])
         self.assertNotIn('gradlew', self.build['build'][-1])
         self.assertNotIn('cd android', self.build['build'][-1])
@@ -68,7 +70,7 @@ class FdroiddataCandidateTests(unittest.TestCase):
     def test_fdroid_build_commands_preserve_android_working_directory(self):
         # F-Droid executes successive build commands in the same shell.
         # A plain "cd .. && make assets" would break the following relative Gradle path.
-        asset_command, gradle_command = self.build['build'][-2:]
+        asset_command, gradle_command = self.build['build'][-4], self.build['build'][-1]
         self.assertEqual(asset_command, 'make -C .. assets')
         self.assertTrue(gradle_command.startswith(
             'bash .cache/gradle/gradle-8.13/bin/gradle -p . --no-daemon '

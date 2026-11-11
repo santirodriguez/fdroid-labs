@@ -11,7 +11,7 @@ spec.loader.exec_module(checker)
 KNOWN_LOCAL_WARNING = (
     "2026-11-11 05:15:28,613 WARNING: "
     "org.cajapersonal.sudokura:1.4.1 runs this on the buildserver with sudo:\n"
-    "\t['apt-get update', 'apt-get install -y golang-go make']\n"
+    "\t['echo \"deb https://deb.debian.org/debian bookworm main\" > /etc/apt/sources.list.d/bookworm.list', 'apt-get update', 'apt-get install -y golang-go make', 'apt-get install -y -t bookworm openjdk-17-jdk-headless', 'update-java-alternatives -s java-1.17.0-openjdk-amd64']\n"
     "These commands were skipped because fdroid build is not running "
     "on a dedicated build server.\n"
 )
