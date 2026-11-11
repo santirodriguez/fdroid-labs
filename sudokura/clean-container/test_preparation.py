@@ -62,6 +62,19 @@ class ContainerCandidateTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, content)
 
+    def test_fdroid_patch_tool_is_available_before_scanning(self):
+        dockerfile = (ROOT / "sudokura" / "Dockerfile").read_text(encoding="utf-8")
+        package_list = dockerfile.split("apt-get install -y --no-install-recommends", 1)[1].split(
+            "&& rm -rf", 1
+        )[0]
+        self.assertRegex(package_list, r"(?<![\w-])patch(?![\w-])")
+
+        script = RUN.read_text(encoding="utf-8")
+        self.assertIn("command -v patch >/dev/null 2>&1", script)
+        self.assertIn("Missing patch executable required by F-Droid metadata", script)
+        self.assertLess(script.index("command -v patch"), script.index("run_check readmeta"))
+        self.assertIn("0 problems? found' logs/scanner.log", script)
+
     def test_real_candidate_build_without_signing(self):
         content = RUN.read_text(encoding="utf-8")
         self.assertIn("fdroid readmeta", content)
