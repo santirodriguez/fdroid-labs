@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Stage the immutable F-Droid candidate for one disposable container-only build.
 
-The sole metadata deviations are the local source mirror and temporary removal
-of the NOT-YET-PUBLISHED upstream binary URL. Never alter upstream metadata.
+The local source-build test uses a verified Git mirror and omits the now-public
+upstream binary URL only from disposable scratch. Never alter the real recipe.
 """
 import argparse
 import hashlib
@@ -44,7 +44,7 @@ def sha256(path):
 def omit_unpublished_binary(metadata):
     """Make precisely one explicit TEST-ONLY deviation from the candidate."""
     if metadata.count(BINARY_LINE) != 1:
-        raise ValueError("Expected exactly one pinned, unpublished binary URL")
+        raise ValueError("Expected exactly one pinned, public upstream binary URL")
     if metadata.count("AllowedAPKSigningKeys: " + SIGNER_SHA) != 1:
         raise ValueError("Original signer fingerprint is missing or ambiguous")
     if metadata.count("commit: " + SOURCE_SHA) != 1:
