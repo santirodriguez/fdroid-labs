@@ -98,6 +98,16 @@ jobs:
           test -s "$work/metadata/org.cajapersonal.sudokura.yml"
           ! grep -q '^[[:space:]]*binary:' "$work/metadata/org.cajapersonal.sudokura.yml"
 
+      - name: Stage exact original font and copyright from pinned Ubuntu package
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/sudokura-cold-fdroid"
+          python3 lab/sudokura/clean-container/stage-font.py --work "$work"
+          test -s "$work/logs/verified-font.txt"
+          test -s "$work/verified-font/DejaVuSans.ttf"
+          test -s "$work/verified-font/copyright"
+
       - name: Build throwaway fdroidserver 2.4.5 Docker image from clean inputs
         shell: bash
         run: |
@@ -124,6 +134,8 @@ jobs:
             -e GRADLE_USER_HOME=/work/fdroid/gradle-home \
             -v "$work:/work/fdroid:rw" \
             -v "$SDK_ROOT:/opt/android-sdk:ro" \
+            --mount "type=bind,src=$work/verified-font/DejaVuSans.ttf,dst=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf,readonly" \
+            --mount "type=bind,src=$work/verified-font/copyright,dst=/usr/share/doc/fonts-dejavu-core/copyright,readonly" \
             -w /work/fdroid \
             sudokura-fdroid-cold:local bash tools/run-clean.sh
 
@@ -145,6 +157,11 @@ jobs:
             if [[ -f "$work/logs/provenance.txt" ]]; then
               echo '## Immutable sources'
               sed 's/^/- /' "$work/logs/provenance.txt"
+            fi
+            if [[ -f "$work/logs/verified-font.txt" ]]; then
+              echo
+              echo '## Exact font and license provenance'
+              sed 's/^/- /' "$work/logs/verified-font.txt"
             fi
             if [[ -f "$work/logs/outcome.txt" ]]; then
               echo
