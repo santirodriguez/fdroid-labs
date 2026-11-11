@@ -77,7 +77,7 @@ class FdroiddataCandidateTests(unittest.TestCase):
             self.assertTrue(path.startswith('android/.cache/source/'))
             self.assertNotIn('android/app/', path)
             self.assertNotIn('/freetype/', path)
-        self.assertTrue(all(path.endswith(('.DS_Store', '/SDL2', 'Cargo.toml')) for path in expected))
+        self.assertTrue(all(path.endswith(('SDL_DS_Store', '/SDL2', 'Cargo.toml')) for path in expected))
 
     def test_16k_padding_patch_rebuilds_unsigned_zip_without_payload_change(self):
         patch = (PATCH_DIR / 'signer35-align.patch').read_text(encoding='utf-8')
