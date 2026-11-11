@@ -62,13 +62,6 @@ fi
   echo 'Missing compile SDK 36' >&2; exit 2;
 }
 
-# Check the Debian-container font and its copyright independently. The
-# original app requires exact bytes: a different distro font MUST fail, not
-# be silently replaced with a prewarmed Ubuntu font from the previous lab.
-python3 tools/repro-check.py font \
-  /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf \
-  /usr/share/doc/fonts-dejavu-core/copyright
-
 {
   printf 'source_sha=%s\n' "$source_sha"
   printf 'execution=fresh_disposable_Docker_container_with_public_dependency_downloads\n'
@@ -98,6 +91,12 @@ run_check() {
 # fetch (source checkout uses the verified local mirror).
 run_check readmeta fdroid readmeta
 run_check lint fdroid lint "$app"
+# Check the Debian-container font and its copyright independently.
+# Different bytes are an actionable portability failure, never a reason to
+# substitute the previous lab's prewarmed Ubuntu font.
+python3 tools/repro-check.py font \
+  /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf \
+  /usr/share/doc/fonts-dejavu-core/copyright
 run_check scanner fdroid scanner -v "$app:2"
 if ! grep -Eq '(^|[[:space:]])0 problems? found' logs/scanner.log; then
   echo 'Scanner did not explicitly report zero problems' >&2
