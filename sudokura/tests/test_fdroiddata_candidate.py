@@ -22,6 +22,16 @@ class FdroiddataCandidateTests(unittest.TestCase):
         cls.metadata = yaml.safe_load(METADATA.read_text(encoding='utf-8'))
         cls.build = cls.metadata['Builds'][0]
 
+    def test_public_developer_brand_and_project_websites(self):
+        self.assertEqual(self.metadata['AuthorName'], 'Caja Personal')
+        self.assertEqual(self.metadata['AuthorWebSite'], 'https://cajapersonal.org/')
+        self.assertEqual(self.metadata['WebSite'], 'https://sudokura.cajapersonal.org/')
+        self.assertEqual(self.metadata['AutoName'], 'Sudokura')
+        self.assertEqual(
+            self.metadata['Changelog'],
+            'https://github.com/santirodriguez/Sudokura/blob/main/CHANGELOG.md'
+        )
+
     def test_source_binary_and_original_signer_identity(self):
         self.assertEqual(self.metadata['AllowedAPKSigningKeys'], CERT_SHA)
         self.assertEqual(self.metadata['Repo'], 'https://github.com/santirodriguez/Sudokura.git')

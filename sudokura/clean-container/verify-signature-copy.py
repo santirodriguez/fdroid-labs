@@ -52,22 +52,38 @@ def download_reference(destination):
 def check(unsigned_apk):
     if not unsigned_apk.is_file() or unsigned_apk.is_symlink():
         raise ValueError("Missing independent unsigned source-built APK")
-    # Candidate postbuild has already restored Android Build Tools 35 ZIP padding.
-    from fdroidserver import apksigcopier
-    # The vendored Python API consults a module global, not the CLI env flag.
-    # Postbuild has already applied the exact original Android 35 ZIP padding.
-    apksigcopier.skip_realignment = True
+    # The source-build recipe has already restored original Build Tools 35 ZIP
+    # padding. First exercise F-Droid's normal verification function unchanged;
+    # never inject our lab-specific alignment override into this check.
+    from fdroidserver import apksigcopier, common
+    sdk = Path(os.environ.get("ANDROID_HOME", ""))
+    apksigner = sdk / "build-tools" / "35.0.0" / "apksigner"
+    if not apksigner.is_file():
+        raise ValueError("Pinned apksigner verifier missing")
     with tempfile.TemporaryDirectory(prefix="sudokura-sigcopy-") as scratch:
         signed = Path(scratch) / "reference.apk"
         reproduced = Path(scratch) / "reproduced.apk"
         download_reference(signed)
+
+        if apksigcopier.skip_realignment:
+            raise ValueError("Expected unmodified F-Droid signature copier defaults")
+        # Supply only the pinned Android verifier binary to fdroidserver.
+        # The signature-copy implementation and options remain unmodified.
+        common.config = {"apksigner": str(apksigner)}
+        result = common.verify_apks(str(signed), str(unsigned_apk), scratch)
+        if result is not None:
+            raise ValueError("Default fdroidserver.verify_apks rejected the APK: " + str(result))
+        verified = Path(scratch) / ("sigcp_" + unsigned_apk.name)
+        if not verified.is_file() or sha256(verified) != SIGNED_SHA256:
+            raise ValueError("Default F-Droid verification output differed from the published APK")
+        print("PASS: unmodified fdroidserver.common.verify_apks and signed SHA-256")
+
+        # Preserve the earlier independent explicit 16-KiB copy check as an
+        # additional control, not as a replacement for the standard verifier.
+        apksigcopier.skip_realignment = True
         apksigcopier.do_copy(str(signed), str(unsigned_apk), str(reproduced))
         if sha256(reproduced) != SIGNED_SHA256:
             raise ValueError("Signature copy failed to reproduce original signed APK bytes")
-        sdk = Path(os.environ.get("ANDROID_HOME", ""))
-        apksigner = sdk / "build-tools" / "35.0.0" / "apksigner"
-        if not apksigner.is_file():
-            raise ValueError("Pinned apksigner verifier missing")
         report = subprocess.run(
             [str(apksigner), "verify", "--verbose", "--print-certs", str(reproduced)],
             check=True, capture_output=True, text=True, timeout=90,

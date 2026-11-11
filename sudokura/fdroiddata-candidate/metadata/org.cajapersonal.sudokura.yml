@@ -1,8 +1,9 @@
 Categories:
   - Games
 License: GPL-3.0-only
-AuthorName: Santiago Rodriguez
-AuthorWebSite: https://github.com/santirodriguez
+AuthorName: Caja Personal
+AuthorWebSite: https://cajapersonal.org/
+WebSite: https://sudokura.cajapersonal.org/
 AutoName: Sudokura
 SourceCode: https://github.com/santirodriguez/Sudokura
 IssueTracker: https://github.com/santirodriguez/Sudokura/issues
