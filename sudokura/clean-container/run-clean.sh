@@ -83,8 +83,13 @@ run_check() {
   shift
   printf '%s=RUNNING\n' "$label" >> logs/outcome.txt
   if "$@" > "logs/$label.log" 2>&1; then
-    printf '%s=PASS\n' "$label" >> logs/outcome.txt
-    printf '%s PASSED\n' "$label"
+    if [[ "$label" == scanner ]]; then
+      printf 'scanner_command=EXIT_ZERO\n' >> logs/outcome.txt
+      echo 'Scanner process exited zero; checking for reported problems'
+    else
+      printf '%s=PASS\n' "$label" >> logs/outcome.txt
+      printf '%s PASSED\n' "$label"
+    fi
   else
     rc=$?
     printf '%s=FAILED exit=%s\n' "$label" "$rc" >> logs/outcome.txt
@@ -111,6 +116,9 @@ if grep -Eiq '(^|[[:space:]])(WARNING|ERROR|CRITICAL|Traceback)' logs/scanner.lo
   echo 'Scanner reported warning/error that requires review' >&2
   exit 3
 fi
+
+printf 'scanner=PASS_ZERO_PROBLEMS\n' >> logs/outcome.txt
+echo 'Scanner verified zero reported problems'
 
 # Test mode builds into tmp; it cannot publish an F-Droid app.
 run_check build fdroid build --stop --test --no-refresh --no-tarball "$app:2"
